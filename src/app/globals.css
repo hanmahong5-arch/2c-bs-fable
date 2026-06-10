@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* 寓言星球品牌 token — 夜空底 + 暖星光 accent, 正文纸面 */
+@theme {
+  --color-night: #10192c;
+  --color-night-deep: #0a1120;
+  --color-star: #ffd98e;
+  --color-star-soft: #ffe9bf;
+  --color-paper: #fbf7ef;
+  --color-ink: #1c2433;
+  --color-ink-soft: #4b5568;
+  --color-moon: #aebed8;
+
+  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --font-body: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* 故事正文排版 */
+.story-prose p {
+  margin-bottom: 1.25em;
+  line-height: 2;
+  font-size: 1.0625rem;
+  text-align: justify;
+}
+
+/* 夜空星点 (纯 CSS, 不加图片资产) */
+.starfield {
+  background-image:
+    radial-gradient(1px 1px at 12% 28%, rgba(255, 217, 142, 0.9) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 32% 64%, rgba(255, 255, 255, 0.7) 50%, transparent 50%),
+    radial-gradient(1px 1px at 51% 18%, rgba(255, 233, 191, 0.8) 50%, transparent 50%),
+    radial-gradient(2px 2px at 68% 47%, rgba(255, 255, 255, 0.5) 50%, transparent 50%),
+    radial-gradient(1px 1px at 84% 25%, rgba(255, 217, 142, 0.85) 50%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 92% 71%, rgba(255, 255, 255, 0.6) 50%, transparent 50%),
+    radial-gradient(1px 1px at 23% 86%, rgba(255, 233, 191, 0.7) 50%, transparent 50%),
+    radial-gradient(1px 1px at 73% 88%, rgba(255, 255, 255, 0.55) 50%, transparent 50%);
+}
