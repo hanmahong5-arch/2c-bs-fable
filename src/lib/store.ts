@@ -24,9 +24,7 @@ function redis(): Redis {
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error("Redis env missing: KV_REST_API_URL / KV_REST_API_TOKEN");
-  // 关自动反序列化: 本层所有值都是字符串, 否则 JSON 形状的字段 (paragraphs 等)
-  // 读回来会被客户端偷偷 parse 成数组, 下游 JSON.parse 二次解析炸
-  _redis = new Redis({ url, token, automaticDeserialization: false });
+  _redis = new Redis({ url, token });
   return _redis;
 }
 
@@ -64,10 +62,20 @@ const SUB_FIELDS: (keyof Subscriber)[] = [
   "audioKey", "status", "expiresAt", "afdianUserId", "contact", "serialState", "createdAt",
 ];
 
+/**
+ * Upstash 客户端读取时会把 JSON 形状的值自动 parse (paragraphs 等);
+ * 本层契约是「全字符串」→ 读出口统一归一化: 非字符串 stringify 回原文。
+ */
+function str(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v == null) return "";
+  return JSON.stringify(v);
+}
+
 function asSub(id: string, h: Record<string, unknown> | null): Subscriber | null {
   if (!h || !h.token) return null;
   const sub = { id } as Record<string, string>;
-  for (const f of SUB_FIELDS) sub[f] = String(h[f] ?? "");
+  for (const f of SUB_FIELDS) sub[f] = str(h[f]);
   sub.id = id;
   return sub as unknown as Subscriber;
 }
@@ -184,7 +192,7 @@ export async function pushPendingOrder(order: Record<string, unknown>): Promise<
 }
 
 export async function listPendingOrders(): Promise<string[]> {
-  return (await redis().lrange("pending-orders", 0, 49)).map(String);
+  return (await redis().lrange("pending-orders", 0, 49)).map(str);
 }
 
 export async function removePendingOrder(raw: string): Promise<void> {
@@ -202,10 +210,16 @@ export async function putStory(subId: string, story: StoryRecord): Promise<void>
   });
 }
 
+const STORY_FIELDS: (keyof StoryRecord)[] = [
+  "date", "title", "paragraphs", "moral", "audioUrl", "starred", "createdAt",
+];
+
 export async function getStory(subId: string, date: string): Promise<StoryRecord | null> {
   const h = await redis().hgetall(`story:${subId}:${date}`);
   if (!h || !h.title) return null;
-  return h as unknown as StoryRecord;
+  const out = {} as Record<string, string>;
+  for (const f of STORY_FIELDS) out[f] = str(h[f]);
+  return out as unknown as StoryRecord;
 }
 
 /** 历史列表, 新→旧。 */
