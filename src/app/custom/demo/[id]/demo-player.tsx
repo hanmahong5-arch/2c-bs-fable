@@ -1,13 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Share2, Check, Mic, Mail } from "lucide-react";
+import { Share2, Check, Mic, Sparkles } from "lucide-react";
 
 const ID_RE = /^[a-f0-9]{16}$/;
-
-// 内测申请走邮件 (TODO(owner): hi@fable.xin 开通后替换)
-const BETA_EMAIL = "marvin.uu@gmail.com";
 
 export default function DemoPlayer({ id }: { id: string }) {
   const [shared, setShared] = useState(false);
@@ -17,19 +14,6 @@ export default function DemoPlayer({ id }: { id: string }) {
   const src = valid
     ? `${process.env.NEXT_PUBLIC_BLOB_BASE}/voice-demos/${id}.mp3`
     : "";
-
-  const mailto = useMemo(() => {
-    const link = `https://fable.xin/custom/demo/${id}`;
-    return (
-      `mailto:${BETA_EMAIL}?subject=` +
-      encodeURIComponent("亲声故事内测申请") +
-      "&body=" +
-      encodeURIComponent(
-        `我刚生成了亲声试听：${link}\n\n` +
-          "孩子昵称：\n年龄：\n最想用自己的声音给孩子讲什么主题的故事：\n",
-      )
-    );
-  }, [id]);
 
   const share = async () => {
     const url = window.location.href;
@@ -89,10 +73,29 @@ export default function DemoPlayer({ id }: { id: string }) {
           而是你的声音。
         </p>
 
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
+        {/* 主 CTA: 试听 → 3 晚免费专属连载 (funnel 下一步) */}
+        <div className="mt-10 rounded-2xl border border-moon/30 bg-night-deep/60 p-5 text-left">
+          <p className="font-display text-lg text-star-soft leading-snug">
+            让这个声音，给你家孩子讲一个
+            <br />
+            TA 自己当主角的故事
+          </p>
+          <p className="mt-2 text-sm text-moon leading-relaxed">
+            填上孩子的小名和最近的事，今晚 19:00 起，连续 3 晚免费收到为 TA 新写的连载故事——用你刚听到的这个声音念。
+          </p>
+          <Link
+            href={`/trial?demo=${id}`}
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-star px-7 py-3 font-medium text-night hover:bg-star-soft transition-colors"
+          >
+            <Sparkles size={18} aria-hidden />
+            免费开通 3 晚专属连载
+          </Link>
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             onClick={share}
-            className="inline-flex items-center gap-2 rounded-full bg-star px-7 py-3 font-medium text-night hover:bg-star-soft transition-colors"
+            className="inline-flex items-center gap-2 rounded-full border border-moon px-7 py-3 text-moon hover:text-star hover:border-star transition-colors"
           >
             {shared ? <Check size={18} aria-hidden /> : <Share2 size={18} aria-hidden />}
             {shared ? "链接已复制" : "分享给家人听听"}
@@ -105,14 +108,6 @@ export default function DemoPlayer({ id }: { id: string }) {
             我也想用自己的声音
           </Link>
         </div>
-
-        <p className="mt-12 text-sm text-moon">
-          想要「每晚都用你的声音讲一个新故事」？
-          <a href={mailto} className="underline hover:text-star ml-1 inline-flex items-center gap-1">
-            <Mail size={13} aria-hidden />
-            申请内测（限免）
-          </a>
-        </p>
       </div>
     </div>
   );

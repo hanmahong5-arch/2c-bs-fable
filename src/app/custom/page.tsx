@@ -47,10 +47,61 @@ export default function CustomPage() {
         <VoiceRecorder />
       </div>
 
+      {/* 信任三承诺: 非折叠, 录音动作前就看得见 */}
+      <div className="mt-6 rounded-2xl border border-star bg-star-soft/30 p-5">
+        <p className="font-medium text-ink">我们对你的声音的三个承诺</p>
+        <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-ink-soft">
+          <li>
+            <strong className="text-ink">① 你的声音只住在你家的故事里。</strong>
+            不共享给任何人，不用于训练，不作任何其他用途。
+          </li>
+          <li>
+            <strong className="text-ink">② 随时一键删除。</strong>
+            删除按钮就在你的电台页上，点击后云端录音样本与声音模型即时清除。
+          </li>
+          <li>
+            <strong className="text-ink">③ 它只能念我们生成并安全审核过的故事。</strong>
+            我们不提供「任意文本朗读」——你的声音不可能被拿去说别的话。
+          </li>
+        </ul>
+      </div>
+
       <p className="mt-4 text-xs leading-relaxed text-ink-soft">
         合规说明：仅支持克隆<strong>你本人</strong>的声音，须经本人明确同意；
         禁止上传名人、公众人物或任何未经授权的他人声音；克隆音色仅用于本人家庭场景。
       </p>
+
+      {/* FAQ: 第一条直面 AI 声音诈骗新闻 */}
+      <hr className="my-12 border-star" />
+      <h2 className="font-display text-2xl mb-5">常见问题</h2>
+      <div className="space-y-5 text-sm leading-relaxed">
+        <div>
+          <p className="font-medium text-ink">新闻里说 AI 克隆声音被用来诈骗，这个安全吗？</p>
+          <p className="mt-1.5 text-ink-soft">
+            那些骗局的前提是「能让 AI 声音说任何话」。我们在产品上掐断了这一点：你的声音
+            <strong className="text-ink">只能念我们为孩子生成并安全审核过的睡前故事</strong>
+            ，不开放任意文本输入；声音样本只属于你家，随时一键删除。这不是一句口号，而是写死在系统里的限制。
+          </p>
+        </div>
+        <div>
+          <p className="font-medium text-ink">录音要什么条件？</p>
+          <p className="mt-1.5 text-ink-soft">
+            安静的房间，自然说 15–30 秒就够了。不需要普通话标准——孩子要听的本来就是你平时说话的样子。
+          </p>
+        </div>
+        <div>
+          <p className="font-medium text-ink">孩子睡觉不想用手机播怎么办？</p>
+          <p className="mt-1.5 text-ink-soft">
+            订阅家庭每周可以下载「故事包」（7 个 mp3），传到牛听听等故事机或任何播放器里，睡觉就不用抱着手机了。
+          </p>
+        </div>
+        <div>
+          <p className="font-medium text-ink">每晚的故事真的是新写的吗？</p>
+          <p className="mt-1.5 text-ink-soft">
+            是。亲声工坊每晚为每个孩子单独生成一篇：TA 的小名是主角，最近的事织进情节，连载世界一晚一晚长大。不是从故事库里挑一篇换个声音。
+          </p>
+        </div>
+      </div>
 
       {/* ── 定制专属故事 (原有内容) ── */}
       <hr className="my-12 border-star" />

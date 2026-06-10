@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { rememberDemoVoice } from "@/lib/store";
 
 // 同步流全程 (上传→克隆登记→合成→存 Blob) 需要的窗口; Fluid compute 下 hobby 可到 90s
 export const maxDuration = 90;
@@ -94,6 +95,13 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("voice register error", e);
     return fail(504, BUSY_MESSAGE);
+  }
+
+  // demoId→voiceId 留底 30 天: 试听转订阅时复用音色, 失败不阻塞 demo 主流程
+  try {
+    await rememberDemoVoice(demoId, voiceId);
+  } catch (e) {
+    console.error("remember demo voice failed", e);
   }
 
   // 2) 用克隆音色合成固定 demo 文本 (走 newapi, 与商业路径同链路)

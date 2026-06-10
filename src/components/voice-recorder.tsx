@@ -7,7 +7,14 @@ import { Mic, Square, RotateCcw, Sparkles, Upload } from "lucide-react";
 const MAX_SECONDS = 30;
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
-type Phase = "idle" | "recording" | "recorded" | "uploading";
+type Phase = "idle" | "recording" | "recorded" | "uploading" | "done";
+
+interface VoiceRecorderProps {
+  /** demo=试听流程 (默认, 跳分享页); subscriber=订户正式录音 (替换电台音色) */
+  mode?: "demo" | "subscriber";
+  /** subscriber 模式必填: 电台页 token */
+  token?: string;
+}
 
 /** MediaRecorder 容器协商: Chrome/Android=webm, iOS Safari=mp4 */
 function pickMimeType(): string {
@@ -22,7 +29,7 @@ const UPLOADING_TIPS = [
   "快好了，正在用你的声音朗读…",
 ];
 
-export default function VoiceRecorder() {
+export default function VoiceRecorder({ mode = "demo", token }: VoiceRecorderProps) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -138,22 +145,29 @@ export default function VoiceRecorder() {
     const form = new FormData();
     form.append("file", sample.file);
     form.append("consent", "true");
+    if (mode === "subscriber" && token) form.append("token", token);
+    const endpoint = mode === "subscriber" ? "/api/voice-upload" : "/api/voice-demo";
     try {
-      const res = await fetch("/api/voice-demo", { method: "POST", body: form });
+      const res = await fetch(endpoint, { method: "POST", body: form });
       const data = (await res.json().catch(() => null)) as
-        | { demoId?: string; error?: string }
+        | { demoId?: string; ok?: boolean; error?: string }
         | null;
-      if (!res.ok || !data?.demoId) {
+      if (!res.ok || (mode === "demo" ? !data?.demoId : !data?.ok)) {
         setError(data?.error ?? "出了点小问题，请稍后再试。");
         setPhase("recorded");
         return;
       }
-      router.push(`/custom/demo/${data.demoId}`);
+      if (mode === "subscriber") {
+        setPhase("done");
+        router.refresh();
+        return;
+      }
+      router.push(`/custom/demo/${data!.demoId}`);
     } catch {
       setError("网络不太稳定，请重试一次。");
       setPhase("recorded");
     }
-  }, [sample, consent, router]);
+  }, [sample, consent, router, mode, token]);
 
   return (
     <div className="rounded-2xl bg-night starfield text-paper px-6 py-8 sm:px-8">
@@ -263,6 +277,15 @@ export default function VoiceRecorder() {
             {UPLOADING_TIPS[tipIndex]}
           </p>
           <p className="mt-2 text-sm text-moon">别关页面，半分钟左右就好。</p>
+        </div>
+      )}
+
+      {phase === "done" && (
+        <div className="text-center py-4">
+          <p className="text-star-soft font-medium">✓ 新声音已生效</p>
+          <p className="mt-2 text-sm text-moon">
+            从今晚的故事开始，就用这段新录音的声音来念；旧的录音样本已删除。
+          </p>
         </div>
       )}
 

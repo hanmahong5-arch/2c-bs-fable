@@ -1,0 +1,260 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ChevronDown, Download, Mic, Share, Star, Trash2 } from "lucide-react";
+import VoiceRecorder from "@/components/voice-recorder";
+
+export interface StoryView {
+  date: string;
+  title: string;
+  paragraphs: string[];
+  moral: string;
+  audioUrl: string; // 空 = 缺更或已归档
+  starred: boolean;
+  archived: boolean; // 音频已过 14 天滚动
+}
+
+/** 今晚故事卡 + 听完点亮星星。 */
+export function StoryCard({
+  token,
+  story,
+  tonight,
+}: {
+  token: string;
+  story: StoryView;
+  tonight?: boolean;
+}) {
+  const [starred, setStarred] = useState(story.starred);
+  const [open, setOpen] = useState(tonight ?? false);
+  const [busy, setBusy] = useState(false);
+
+  const star = async () => {
+    if (starred || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/radio/star", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, date: story.date }),
+      });
+      if (res.ok) setStarred(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`rounded-2xl border p-5 ${tonight ? "border-star bg-night starfield text-paper" : "border-ink/10 bg-white"}`}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div>
+          <p className={`text-xs ${tonight ? "text-moon" : "text-ink-soft"}`}>
+            {story.date}
+            {tonight && " · 今晚"}
+          </p>
+          <h3 className={`font-display text-lg leading-snug ${tonight ? "text-star-soft" : ""}`}>
+            {story.title}
+            {starred && <Star size={16} className="ml-2 inline fill-amber-400 text-amber-400" aria-label="已点亮" />}
+          </h3>
+        </div>
+        <ChevronDown
+          size={18}
+          className={`shrink-0 transition-transform ${open ? "rotate-180" : ""} ${tonight ? "text-moon" : "text-ink-soft"}`}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <div className="mt-4">
+          {story.audioUrl ? (
+            <audio src={story.audioUrl} controls preload="metadata" className="w-full" />
+          ) : (
+            <p className={`text-sm ${tonight ? "text-moon" : "text-ink-soft"}`}>
+              {story.archived
+                ? "这一晚的音频已归档（音频保留 14 天），故事文字一直都在，可以读给孩子听。"
+                : "今晚工坊休息了一下，音频稍后补上；先把文字念给孩子听也很好。"}
+            </p>
+          )}
+          <div className={`mt-4 space-y-3 text-sm leading-relaxed ${tonight ? "text-star-soft/90" : "text-ink-soft"}`}>
+            {story.paragraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+            {story.moral && (
+              <p className={tonight ? "text-moon" : "text-ink-soft"}>
+                今晚的小种子：{story.moral}
+              </p>
+            )}
+          </div>
+          {!starred && (
+            <button
+              onClick={star}
+              disabled={busy}
+              className={`mt-4 inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm transition-colors ${
+                tonight
+                  ? "border-moon text-moon hover:border-star hover:text-star"
+                  : "border-ink/20 text-ink-soft hover:border-night hover:text-night"
+              } disabled:opacity-50`}
+            >
+              <Star size={15} aria-hidden />
+              听完啦，点亮今晚的星星
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 微信浮窗 / iOS / 安卓三分支「加桌面」引导。 */
+export function AddToHomeGuide() {
+  // 懒初始化读 UA: SSR 时 navigator 不存在 → "other"; 提示文案仅在用户展开后渲染, 无水合不一致
+  const [env] = useState<"wechat" | "ios" | "android" | "other">(() => {
+    if (typeof navigator === "undefined") return "other";
+    const ua = navigator.userAgent;
+    if (/MicroMessenger/i.test(ua)) return "wechat";
+    if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+    if (/Android/i.test(ua)) return "android";
+    return "other";
+  });
+  const [open, setOpen] = useState(false);
+
+  const tip = useMemo(() => {
+    switch (env) {
+      case "wechat":
+        return "点右上角「···」→ 选「浮窗」，下次从微信侧边一划就能回到电台；也可以「在浏览器打开」后加到手机桌面。";
+      case "ios":
+        return "用 Safari 打开本页 → 点底部分享按钮 → 「添加到主屏幕」，电台就像 App 一样躺在桌面上。";
+      case "android":
+        return "用浏览器打开本页 → 点菜单「⋮」→ 「添加到主屏幕」，每晚一点就开。";
+      default:
+        return "把本页加入书签或发送到手机，每晚 19:00 打开就有新故事。";
+    }
+  }, [env]);
+
+  return (
+    <div className="rounded-2xl border border-star bg-star-soft/30 p-4">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-2 text-left">
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-ink">
+          <Share size={15} aria-hidden />
+          把电台放到手机桌面 / 微信浮窗
+        </span>
+        <ChevronDown size={16} className={`shrink-0 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+      </button>
+      {open && <p className="mt-3 text-sm leading-relaxed text-ink-soft">{tip}</p>}
+    </div>
+  );
+}
+
+/** 周故事包下载 + 牛听听等故事机喂入教程。 */
+export function WeeklyPack({ token, available }: { token: string; available: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border border-ink/10 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-ink">
+          <Download size={15} aria-hidden />
+          本周故事包（mp3）
+        </span>
+        {available ? (
+          <a
+            href={`/radio/${token}/weekly.zip`}
+            className="rounded-full bg-night px-5 py-2 text-sm text-star hover:bg-night-deep transition-colors"
+          >
+            下载 zip
+          </a>
+        ) : (
+          <span className="text-sm text-ink-soft">本周还没有音频，明早再来</span>
+        )}
+      </div>
+      <button onClick={() => setOpen((o) => !o)} className="mt-2 text-xs text-ink-soft underline">
+        怎么喂给牛听听等故事机？
+      </button>
+      {open && (
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-ink-soft">
+          <li>下载 zip 后在手机/电脑上解压，得到 7 个 mp3。</li>
+          <li>打开故事机 App（如牛听听）→「云盘 / 自定义内容」→ 上传这些 mp3。</li>
+          <li>在故事机上选这个歌单播放——孩子睡觉就不用抱着手机了。</li>
+          <li>每周日下载一次新的故事包即可。</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** 正式录音 (替换音色) + 一键删除声音 (信任承诺②, 显眼不折叠)。 */
+export function VoiceManager({ token, voiceSet }: { token: string; voiceSet: boolean }) {
+  const [showRecorder, setShowRecorder] = useState(!voiceSet);
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const [error, setError] = useState("");
+
+  const removeVoice = async () => {
+    if (!window.confirm("确定删除你的声音吗？云端的录音样本和声音模型会立刻清除，之后的故事会暂停朗读，重新录一段即可恢复。")) return;
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/radio/delete-voice", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "删除失败，请稍后再试。");
+        return;
+      }
+      setDeleted(true);
+      setShowRecorder(true);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {!voiceSet && !deleted && (
+        <p className="rounded-xl bg-star-soft/40 px-4 py-3 text-sm text-ink">
+          还没有你的声音。录一段 15–30 秒，今晚的故事就能用你的声音念。
+        </p>
+      )}
+      {deleted && (
+        <p className="rounded-xl bg-star-soft/40 px-4 py-3 text-sm text-ink">
+          ✓ 你的声音已删除：云端录音样本与声音模型已即时清除。想恢复随时重录一段。
+        </p>
+      )}
+
+      {showRecorder ? (
+        <VoiceRecorder mode="subscriber" token={token} />
+      ) : (
+        <button
+          onClick={() => setShowRecorder(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-ink/20 px-6 py-2.5 text-sm text-ink hover:border-night transition-colors"
+        >
+          <Mic size={15} aria-hidden />
+          重新录一段（换更好的声音样本）
+        </button>
+      )}
+
+      {voiceSet && !deleted && (
+        <div>
+          <button
+            onClick={removeVoice}
+            disabled={deleting}
+            className="inline-flex items-center gap-2 rounded-full border border-red-300 px-6 py-2.5 text-sm text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={15} aria-hidden />
+            {deleting ? "正在删除…" : "一键删除我的声音"}
+          </button>
+          <p className="mt-2 text-xs text-ink-soft">
+            点击后云端录音样本与声音模型即时清除，不可恢复；故事文字会保留。
+          </p>
+          {error && (
+            <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
