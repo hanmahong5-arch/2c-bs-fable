@@ -8,3 +8,6 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# 运营内容 (不进公开仓)
+_ops/
