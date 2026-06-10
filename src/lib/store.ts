@@ -24,7 +24,9 @@ function redis(): Redis {
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) throw new Error("Redis env missing: KV_REST_API_URL / KV_REST_API_TOKEN");
-  _redis = new Redis({ url, token });
+  // 关自动反序列化: 本层所有值都是字符串, 否则 JSON 形状的字段 (paragraphs 等)
+  // 读回来会被客户端偷偷 parse 成数组, 下游 JSON.parse 二次解析炸
+  _redis = new Redis({ url, token, automaticDeserialization: false });
   return _redis;
 }
 
