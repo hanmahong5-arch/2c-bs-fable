@@ -11,13 +11,11 @@ export async function notify(
   const topic = process.env.NTFY_TOPIC;
   if (!topic) return;
   try {
-    await fetch(`https://ntfy.sh/${topic}`, {
+    // JSON publish: header 只收 ASCII, 中文标题必须走 body
+    await fetch("https://ntfy.sh", {
       method: "POST",
-      headers: {
-        Title: encodeURIComponent(title).replace(/%20/g, " "),
-        Priority: priority,
-      },
-      body: message,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ topic, title, message, priority: priority === "high" ? 4 : 3 }),
       signal: AbortSignal.timeout(10_000),
     });
   } catch (e) {
