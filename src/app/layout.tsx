@@ -58,7 +58,7 @@ export default function RootLayout({
         <footer className="bg-night-deep text-moon text-sm">
           <div className="mx-auto max-w-5xl px-5 py-8 space-y-2">
             <p>
-              寓言星球 fable.xin — 原创故事由 AI 创作引擎生成、人工抽审，朗读音频由自研情感语音引擎合成。
+              寓言星球 fable.xin — 原创故事由 AI 创作引擎生成，经自动安全过滤与人工抽查，朗读音频由自研情感语音引擎合成。
             </p>
             <p>
               故事文本采用{" "}

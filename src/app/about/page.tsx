@@ -17,8 +17,18 @@ export default function AboutPage() {
         <h2 className="font-display text-xl text-ink pt-4">故事怎么来的？</h2>
         <p>
           故事由 AI 创作引擎按「角色 — 困境 — 成长 — 寓意」的经典寓言结构生成，
-          再经人工抽审后发布。朗读音频由自研情感语音引擎合成，
+          每篇发布前都经过自动安全过滤（暴力、恐怖、广告、价值观红线逐条校验），
+          并辅以人工抽查。朗读音频由自研情感语音引擎合成，
           针对哄睡场景调校了语速和语气。
+        </p>
+        <h2 className="font-display text-xl text-ink pt-4">在播客 App 收听</h2>
+        <p>
+          每天的故事音频也通过播客 RSS 同步分发：在你常用的播客 App 里订阅{" "}
+          <a href="/feed.xml" className="underline hover:text-ink">
+            fable.xin/feed.xml
+          </a>{" "}
+          即可。各播客平台（小宇宙、Apple Podcasts、喜马拉雅）的收录正在进行中，
+          过审后这里会补上直达链接。
         </p>
         <h2 className="font-display text-xl text-ink pt-4">内容安全</h2>
         <p>

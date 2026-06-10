@@ -49,7 +49,10 @@ interface StoryOut {
   paragraphs: string[];
 }
 
-async function callStory(theme: string): Promise<StoryOut> {
+async function callStory(theme: string, avoidTitles: string[]): Promise<StoryOut> {
+  const avoid = avoidTitles.length
+    ? `\n最近已发布的故事标题（主角不要与其中任何一篇重复，换一种动物或物件）：${avoidTitles.join("、")}。`
+    : "";
   const res = await fetch(NEWAPI_URL, {
     method: "POST",
     headers: {
@@ -63,7 +66,7 @@ async function callStory(theme: string): Promise<StoryOut> {
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `今晚的主题：${theme}。写一篇新故事。` },
+        { role: "user", content: `今晚的主题：${theme}。写一篇新故事。${avoid}` },
       ],
     }),
     signal: AbortSignal.timeout(120_000),
@@ -77,6 +80,38 @@ async function callStory(theme: string): Promise<StoryOut> {
     throw new Error(`bad story json: ${JSON.stringify(out).slice(0, 150)}`);
   }
   return out;
+}
+
+// 第二次独立 LLM 调用做安全自检 (红线: 暴力/恐怖/广告植入/不当价值观; 结尾须平静适合入睡)
+const SAFETY_PROMPT = `你是儿童内容安全审核员。审核一篇给 3-8 岁孩子的睡前故事，红线：
+1. 暴力、打斗、死亡、受伤描写；2. 恐怖、惊吓、悬念结尾；3. 品牌广告、产品植入；
+4. 不当价值观（歧视、欺凌未被纠正、危险行为示范）；5. 结尾不平静、不适合入睡。
+严格输出 JSON：{"safe": true/false, "reason": "<不通过时一句话说明,通过则空串>"}`;
+
+async function checkSafety(story: StoryOut): Promise<{ safe: boolean; reason: string }> {
+  const res = await fetch(NEWAPI_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      Authorization: `Bearer ${TOKEN}`,
+    },
+    body: JSON.stringify({
+      model: STORY_MODEL,
+      temperature: 0,
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SAFETY_PROMPT },
+        { role: "user", content: `标题：${story.title}\n寓意：${story.moral}\n\n${story.paragraphs.join("\n\n")}` },
+      ],
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`safety ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = (await res.json()) as { choices: { message: { content: string } }[] };
+  const out = JSON.parse(data.choices[0].message.content) as { safe?: boolean; reason?: string };
+  if (typeof out.safe !== "boolean") throw new Error(`bad safety json: ${JSON.stringify(out).slice(0, 150)}`);
+  return { safe: out.safe, reason: out.reason ?? "" };
 }
 
 async function synthPart(text: string): Promise<Buffer> {
@@ -106,6 +141,18 @@ async function makeAudio(story: { title: string; moral: string; paragraphs: stri
     bufs.push(await synthPart(p));
   }
   await fs.writeFile(outPath, Buffer.concat(bufs));
+}
+
+/** 最近 n 篇故事标题 (文件名 date 前缀升序 → 取尾部即最新), 喂给 prompt 避免主角撞车 */
+async function recentTitles(files: string[], n = 10): Promise<string[]> {
+  const md = files.filter((f) => f.endsWith(".md")).sort().slice(-n);
+  const titles: string[] = [];
+  for (const f of md) {
+    const raw = await fs.readFile(path.join(STORIES_DIR, f), "utf-8");
+    const m = raw.match(/^title:\s*"?(.*?)"?\s*$/m);
+    if (m?.[1]) titles.push(m[1]);
+  }
+  return titles;
 }
 
 function mdFor(story: StoryOut, date: string): string {
@@ -159,11 +206,31 @@ async function main(): Promise<void> {
   const date = new Date().toISOString().slice(0, 10);
   for (let i = 0; i < count; i++) {
     const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
-    let story: StoryOut;
-    try {
-      story = await callStory(theme);
-    } catch (e) {
-      console.error(`[gen] FAIL story(${theme}): ${(e as Error).message}`);
+    const avoid = await recentTitles(existing);
+    // 生成 → 安全自检; 不过审丢弃重生成 (最多 3 次尝试), 全失败当次跳过
+    let story: StoryOut | null = null;
+    for (let attempt = 1; attempt <= 3 && !story; attempt++) {
+      let candidate: StoryOut;
+      try {
+        candidate = await callStory(theme, avoid);
+      } catch (e) {
+        console.error(`[gen] FAIL story(${theme}, attempt ${attempt}): ${(e as Error).message}`);
+        continue;
+      }
+      try {
+        const verdict = await checkSafety(candidate);
+        if (verdict.safe) {
+          story = candidate;
+        } else {
+          console.error(`[gen] UNSAFE (attempt ${attempt}) 《${candidate.title}》: ${verdict.reason} → 丢弃重生成`);
+        }
+      } catch (e) {
+        // 自检自身失败 → 保守处理: 丢弃该篇 (宁可不发, 不发未审内容)
+        console.error(`[gen] safety check error (attempt ${attempt}): ${(e as Error).message} → 丢弃`);
+      }
+    }
+    if (!story) {
+      console.error(`[gen] FAIL story(${theme}): 3 次尝试未产出过审故事, 跳过`);
       continue;
     }
     let base = `${date}-${story.slug.toLowerCase().replace(/[^a-z0-9-]/g, "")}`;
