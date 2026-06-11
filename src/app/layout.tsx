@@ -45,6 +45,9 @@ export default function RootLayout({
               <Link href="/stories" className="hover:text-star transition-colors">
                 故事库
               </Link>
+              <Link href="/articles" className="hover:text-star transition-colors">
+                内容库
+              </Link>
               <Link href="/custom" className="hover:text-star transition-colors">
                 定制故事
               </Link>
