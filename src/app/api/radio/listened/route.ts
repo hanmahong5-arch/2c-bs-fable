@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSubscriberByToken, getStory, starStory, markStoryListened } from "@/lib/store";
+import { getSubscriberByToken, markStoryListened } from "@/lib/store";
 
-/** 孩子听完点亮星星 (token 鉴权; 只能点自己已存在的故事)。 */
+/** 收听触达上报 (audio onPlay): token 鉴权, 幂等置位; 故事不存在则静默 no-op。 */
 export async function POST(req: Request) {
   let body: { token?: string; date?: string };
   try {
@@ -15,9 +15,6 @@ export async function POST(req: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: "bad date" }, { status: 400 });
   }
-  const story = await getStory(sub.id, date);
-  if (!story) return NextResponse.json({ error: "story not found" }, { status: 404 });
-  await starStory(sub.id, date);
-  await markStoryListened(sub.id, date); // 点星即触达
+  await markStoryListened(sub.id, date);
   return NextResponse.json({ ok: true });
 }

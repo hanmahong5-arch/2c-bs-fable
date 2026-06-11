@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, Download, Mic, Share, Star, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ChevronDown, Download, Mic, Send, Share, Star, Trash2 } from "lucide-react";
 import VoiceRecorder from "@/components/voice-recorder";
 
 export interface StoryView {
@@ -12,6 +12,7 @@ export interface StoryView {
   audioUrl: string; // 空 = 缺更或已归档
   starred: boolean;
   archived: boolean; // 音频已过 14 天滚动
+  note: string; // 本篇织入的家长捎话 (非空 → 渲染回应徽章)
 }
 
 /** 今晚故事卡 + 听完点亮星星。 */
@@ -27,6 +28,18 @@ export function StoryCard({
   const [starred, setStarred] = useState(story.starred);
   const [open, setOpen] = useState(tonight ?? false);
   const [busy, setBusy] = useState(false);
+  const reported = useRef(false);
+
+  // D2 触达遥测: 首次播放上报一次 (fire-and-forget, 失败静默 — 不打扰睡前)
+  const reportPlay = () => {
+    if (reported.current) return;
+    reported.current = true;
+    void fetch("/api/radio/listened", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, date: story.date }),
+    }).catch(() => {});
+  };
 
   const star = async () => {
     if (starred || busy) return;
@@ -68,8 +81,13 @@ export function StoryCard({
 
       {open && (
         <div className="mt-4">
+          {story.note && (
+            <p className={`mb-3 rounded-xl px-3 py-2 text-xs leading-relaxed ${tonight ? "bg-night-deep/60 text-star-soft" : "bg-star-soft/40 text-ink"}`}>
+              ✨ 本篇回应了你捎的话：『{story.note}』
+            </p>
+          )}
           {story.audioUrl ? (
-            <audio src={story.audioUrl} controls preload="metadata" className="w-full" />
+            <audio src={story.audioUrl} controls preload="metadata" className="w-full" onPlay={reportPlay} />
           ) : (
             <p className={`text-sm ${tonight ? "text-moon" : "text-ink-soft"}`}>
               {story.archived
@@ -102,6 +120,107 @@ export function StoryCard({
             </button>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+const MAX_NOTE = 50;
+
+/**
+ * 「给工坊捎句话」(D1 闭环传感器): 家长捎孩子今天的近况, 明晚故事织入。
+ * variant: normal=承诺「明晚见」; trialDone=付费钩子 (note 照存, 开通后第一晚消费)。expired 由页面隐藏。
+ */
+export function NoteBox({
+  token,
+  childName,
+  defaultNote,
+  variant,
+}: {
+  token: string;
+  childName: string;
+  defaultNote: string;
+  variant: "normal" | "trialDone";
+}) {
+  const [note, setNote] = useState(defaultNote);
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const send = async () => {
+    const trimmed = note.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/radio/note", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, note: trimmed }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        setError(data?.error ?? "没捎出去，请稍后再试。");
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError("没捎出去，请稍后再试。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const prompt =
+    variant === "trialDone"
+      ? `今天${childName}经历了什么？捎给工坊，开通后写进${childName}的第 4 晚`
+      : `今天${childName}经历了什么？捎给工坊，明晚的故事里见 🌙`;
+  const confirmation =
+    variant === "trialDone"
+      ? `已收下。开通连载后，这句话会写进${childName}的第 4 晚。`
+      : "已捎到，明早工坊开工时会读到。";
+
+  return (
+    <div className="rounded-2xl border border-star bg-star-soft/30 p-4">
+      <p className="inline-flex items-center gap-2 text-sm font-medium text-ink">
+        <Send size={15} aria-hidden />
+        给工坊捎句话
+      </p>
+      {sent ? (
+        <p className="mt-3 rounded-xl bg-white/70 px-4 py-3 text-sm leading-relaxed text-ink">
+          ✓ {confirmation}
+          {note.trim() && <span className="mt-1 block text-xs text-ink-soft">『{note.trim()}』</span>}
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">{prompt}</p>
+          <div className="mt-3 flex items-start gap-2">
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE))}
+              maxLength={MAX_NOTE}
+              rows={2}
+              placeholder="比如：她今天第一次自己梳头"
+              className="min-w-0 flex-1 resize-none rounded-xl border border-ink/15 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-soft/60 focus:border-night focus:outline-none"
+            />
+            <button
+              onClick={send}
+              disabled={busy || !note.trim()}
+              className="shrink-0 rounded-full bg-night px-5 py-2 text-sm text-star hover:bg-night-deep transition-colors disabled:opacity-50"
+            >
+              {busy ? "捎出中…" : "捎过去"}
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-ink-soft/80">
+            {note.length}/{MAX_NOTE} 字 · 当天可以改，工坊每天早上来取一次
+          </p>
+          {defaultNote && (
+            <p className="mt-1 text-xs text-ink-soft">已有一句在等工坊：『{defaultNote}』，再捎会替换它。</p>
+          )}
+          {error && (
+            <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>
+          )}
+        </>
       )}
     </div>
   );

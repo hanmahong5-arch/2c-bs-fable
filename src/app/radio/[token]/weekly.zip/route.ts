@@ -1,5 +1,5 @@
 import { zipSync } from "fflate";
-import { getSubscriberByToken, listStories } from "@/lib/store";
+import { getSubscriberByToken, listStories, markStoryListened } from "@/lib/store";
 import { bjDaysSince } from "@/lib/beijing";
 
 export const maxDuration = 60;
@@ -33,6 +33,9 @@ export async function GET(
   if (Object.keys(files).length === 0) {
     return new Response("音频暂时取不到，请稍后再试", { status: 502 });
   }
+
+  // 下载即触达: 产品主动把收听推离网页 (故事机), 对本周最新一晚置位
+  await markStoryListened(sub.id, stories[0].date);
 
   // mp3 已压缩, 存储级打包即可 (level 0, 快)
   const zip = zipSync(files, { level: 0 });

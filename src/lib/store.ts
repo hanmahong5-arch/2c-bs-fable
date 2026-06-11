@@ -44,6 +44,7 @@ export interface Subscriber {
   afdianUserId: string;
   contact: string; // 微信号/手机, owner 联络用
   serialState: string; // 连载宇宙状态 JSON (前情/角色成长/未来 7 晚预告)
+  pendingNote: string; // 家长「捎给工坊」的孩子近况; 单字段覆盖写=每晚最多一条, 管线消费后清空
   createdAt: string;
 }
 
@@ -54,12 +55,15 @@ export interface StoryRecord {
   moral: string;
   audioUrl: string; // 空=当晚缺更或已过 14 天滚动
   starred: string; // "1"=孩子点亮过星星
+  listened: string; // "1"=当晚触达 (播放/点星/捎话/zip 任一信号)
+  note: string; // 本篇实际织入的家长捎话原文 (页面徽章用)
   createdAt: string;
 }
 
 const SUB_FIELDS: (keyof Subscriber)[] = [
   "id", "childName", "age", "prefs", "weeklyTheme", "voiceId", "token",
-  "audioKey", "status", "expiresAt", "afdianUserId", "contact", "serialState", "createdAt",
+  "audioKey", "status", "expiresAt", "afdianUserId", "contact", "serialState",
+  "pendingNote", "createdAt",
 ];
 
 /**
@@ -109,6 +113,7 @@ export async function createSubscriber(
     afdianUserId: input.afdianUserId ?? "",
     contact: input.contact ?? "",
     serialState: "",
+    pendingNote: "",
     createdAt: new Date().toISOString(),
   };
   const r = redis();
@@ -211,7 +216,7 @@ export async function putStory(subId: string, story: StoryRecord): Promise<void>
 }
 
 const STORY_FIELDS: (keyof StoryRecord)[] = [
-  "date", "title", "paragraphs", "moral", "audioUrl", "starred", "createdAt",
+  "date", "title", "paragraphs", "moral", "audioUrl", "starred", "listened", "note", "createdAt",
 ];
 
 export async function getStory(subId: string, date: string): Promise<StoryRecord | null> {
@@ -239,6 +244,25 @@ export async function setStoryAudio(subId: string, date: string, audioUrl: strin
 
 export async function starStory(subId: string, date: string): Promise<void> {
   await redis().hset(`story:${subId}:${date}`, { starred: "1" });
+}
+
+/** 触达置位 (幂等): 播放/点星/捎话/zip 任一信号都算「这晚到达了孩子」。故事不存在则 no-op, 不留孤儿键。 */
+export async function markStoryListened(subId: string, date: string): Promise<void> {
+  const key = `story:${subId}:${date}`;
+  const title = await redis().hget(key, "title");
+  if (!title) return;
+  await redis().hset(key, { listened: "1" });
+}
+
+// ── 捎话 (家长→工坊单向信道) ──
+
+export async function setPendingNote(id: string, note: string): Promise<void> {
+  await redis().hset(`sub:${id}`, { pendingNote: note });
+}
+
+/** 管线 putStory 成功后才调用 — 失败时 note 留给 2h retry 捞起。 */
+export async function clearPendingNote(id: string): Promise<void> {
+  await redis().hset(`sub:${id}`, { pendingNote: "" });
 }
 
 export async function countStarred(subId: string): Promise<number> {

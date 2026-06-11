@@ -10,6 +10,7 @@ import {
 import { bjDaysSince, bjHour, bjToday, parseSerialState } from "@/lib/beijing";
 import {
   AddToHomeGuide,
+  NoteBox,
   StoryCard,
   VoiceManager,
   WeeklyPack,
@@ -44,8 +45,8 @@ function NotFound() {
   );
 }
 
-/** 付费墙卡片: 第 3 晚后展示, 未来 7 晚标题预告具象化「不续就听不到」。 */
-function Paywall({ sub, upcoming, seatsLeft }: { sub: Subscriber; upcoming: string[]; seatsLeft: number }) {
+/** 付费墙卡片: 第 3 晚后展示, 未来 7 晚标题预告 + 家长捎的话具象化「不续就听不到」。 */
+function Paywall({ sub, upcoming, seatsLeft, pendingNote }: { sub: Subscriber; upcoming: string[]; seatsLeft: number; pendingNote: string }) {
   const afdianUrl = process.env.AFDIAN_PLAN_URL ?? "";
   // 家庭码 = sub.id: webhook 用它自动匹配订单, 比贴整条链接靠谱
   const remark = `家庭码 ${sub.id} 孩子昵称 ${sub.childName}`;
@@ -67,6 +68,11 @@ function Paywall({ sub, upcoming, seatsLeft }: { sub: Subscriber; upcoming: stri
             ))}
           </ul>
         </div>
+      )}
+      {pendingNote && (
+        <p className="mt-4 rounded-xl bg-night-deep/60 px-4 py-3 text-sm leading-relaxed text-star-soft">
+          你捎的话『{pendingNote}』，会写进{sub.childName}的第 4 晚。
+        </p>
       )}
       <p className="mt-5 text-sm leading-relaxed text-moon">
         成为「创始家庭」，每晚都有一个为{sub.childName}新写的故事，用你的声音念给 TA。
@@ -129,6 +135,7 @@ export default async function RadioPage({
       audioUrl: archived ? "" : s.audioUrl,
       starred: s.starred === "1",
       archived,
+      note: s.note,
     };
   });
 
@@ -160,6 +167,9 @@ export default async function RadioPage({
           <Star size={14} className="fill-amber-400 text-amber-400" aria-hidden />
           已点亮 {starCount} 颗星 · 每晚听完一个故事，就多一颗
         </p>
+        {nights > 0 && (
+          <p className="mt-1.5 text-xs text-moon/80">工坊已陪{sub.childName}走过第 {nights} 晚</p>
+        )}
       </div>
 
       {/* 状态条 */}
@@ -196,10 +206,27 @@ export default async function RadioPage({
         )}
       </section>
 
+      {/* 给工坊捎句话 (D1): expired 隐藏; trial 第 3 晚后变体为付费钩子 */}
+      {!expired && (
+        <section className="mt-6">
+          <NoteBox
+            token={token}
+            childName={sub.childName}
+            defaultNote={sub.pendingNote}
+            variant={trialDone ? "trialDone" : "normal"}
+          />
+        </section>
+      )}
+
       {/* 付费墙 (trial 第 3 晚后 / 过期) */}
       {showPaywall && (
         <section className="mt-6">
-          <Paywall sub={sub} upcoming={serial.upcoming ?? []} seatsLeft={seatsLeft} />
+          <Paywall
+            sub={sub}
+            upcoming={serial.upcoming ?? []}
+            seatsLeft={seatsLeft}
+            pendingNote={trialDone ? sub.pendingNote : ""}
+          />
         </section>
       )}
 
