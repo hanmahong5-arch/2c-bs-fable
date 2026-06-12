@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, Square, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { setDemoId } from "@/lib/local-identity";
 
 const MAX_SECONDS = 30;
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
@@ -162,6 +163,8 @@ export default function VoiceRecorder({ mode = "demo", token }: VoiceRecorderPro
         router.refresh();
         return;
       }
+      // 本机记住 demoId (30 天内回访可续用音色, 不用重录); 写失败静默
+      setDemoId(data!.demoId!);
       router.push(`/custom/demo/${data!.demoId}`);
     } catch {
       setError("网络不太稳定，请重试一次。");

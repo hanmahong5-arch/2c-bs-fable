@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getArticle, getArticleIndex, getCategories } from "@/lib/articles";
+import ReadInMyVoice from "./read-in-my-voice";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,9 @@ export default async function ArticlePage({ params }: Props) {
       {a.tags.length > 0 && (
         <p className="mt-6 text-xs text-ink-soft">{a.tags.map((t) => `#${t}`).join("  ")}</p>
       )}
+
+      {/* 七期 D3: 声音资产日常化 — 有电台的用户一键亲声朗读, 没有的进录音漏斗 */}
+      <ReadInMyVoice category={a.category} slug={a.slug} />
 
       {/* 商业闭环: 内容库 → 亲声连载漏斗 */}
       <div className="mt-10 rounded-2xl bg-night starfield p-6 text-paper">

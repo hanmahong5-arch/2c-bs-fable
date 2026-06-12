@@ -73,6 +73,10 @@ export default function DemoPlayer({ id }: { id: string }) {
           而是你的声音。
         </p>
 
+        <p className="mt-3 text-xs text-moon/80">
+          保存这个链接，30 天内随时回来听、随时开通连载，不用重录。
+        </p>
+
         {/* 主 CTA: 试听 → 3 晚免费专属连载 (funnel 下一步) */}
         <div className="mt-10 rounded-2xl border border-moon/30 bg-night-deep/60 p-5 text-left">
           <p className="font-display text-lg text-star-soft leading-snug">

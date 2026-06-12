@@ -22,6 +22,17 @@ export async function putRadioAudio(audioKey: string, date: string, mp3: ArrayBu
   return blob.url;
 }
 
+/** 文章亲声朗读 (七期 D3): 与电台音频同住 radio/<audioKey>/ 下, 撤销时一并删目录。 */
+export async function putArticleAudio(audioKey: string, slug: string, mp3: ArrayBuffer | Buffer): Promise<string> {
+  const blob = await put(`radio/${audioKey}/article-${slug}.mp3`, mp3 as ArrayBuffer, {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: "audio/mpeg",
+    allowOverwrite: true,
+  });
+  return blob.url;
+}
+
 export async function deleteRadioAudio(urls: string[]): Promise<void> {
   if (urls.length) await del(urls);
 }

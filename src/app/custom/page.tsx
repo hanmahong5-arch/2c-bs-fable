@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import VoiceRecorder from "@/components/voice-recorder";
+import ReturnVisitBanner from "@/components/return-visit-banner";
 
 export const metadata: Metadata = {
   title: "用你的声音讲睡前故事 — 亲声试听",
@@ -25,6 +26,7 @@ const STEPS = [
 export default function CustomPage() {
   return (
     <div className="mx-auto max-w-2xl px-5 py-12">
+      <ReturnVisitBanner />
       {/* ── 亲声试听 (核心 funnel) ── */}
       <h1 className="font-display text-3xl">用你的声音，讲今晚的睡前故事</h1>
       <p className="mt-4 leading-relaxed text-ink-soft">

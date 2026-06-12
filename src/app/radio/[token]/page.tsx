@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Moon, Star } from "lucide-react";
 import {
   getSubscriberByToken,
+  listArticleAudios,
   listStories,
   listAllSubscribers,
   type Subscriber,
@@ -10,7 +11,9 @@ import {
 import { bjDaysSince, bjHour, bjToday, parseSerialState } from "@/lib/beijing";
 import {
   AddToHomeGuide,
+  InstantFirstStarter,
   NoteBox,
+  RememberRadio,
   StoryCard,
   VoiceManager,
   WeeklyPack,
@@ -118,6 +121,7 @@ export default async function RadioPage({
   const today = bjToday();
   const unlocked = bjHour() >= UNLOCK_HOUR;
   const all = await listStories(sub.id, 60);
+  const articleAudios = (await listArticleAudios(sub.id)).slice(0, 5);
 
   const views: StoryView[] = all.map((s) => {
     const archived = bjDaysSince(s.date) >= AUDIO_KEEP_DAYS;
@@ -139,11 +143,16 @@ export default async function RadioPage({
     };
   });
 
-  const tonight = unlocked ? views.find((v) => v.date === today) : undefined;
+  // 解锁绕过 (七期 D1): 第一晚即时生成完就立即可见; 第 2 晚起回到 19:00 仪式感
+  const instantUnlock = sub.status === "trial" && all.length === 1;
+  const tonight = unlocked || instantUnlock ? views.find((v) => v.date === today) : undefined;
   const history = views.filter((v) => v !== tonight);
   const starCount = views.filter((v) => v.starred).length;
   const serial = parseSerialState(sub.serialState);
   const nights = views.length;
+
+  // 即时首晚 (七期 D1): 刚开通、一晚都没有 → 渲染生成等待动画 (挂载即触发 instant-first)
+  const instantPending = sub.status === "trial" && all.length === 0 && Boolean(sub.voiceId);
 
   const trialDone = sub.status === "trial" && nights >= 3;
   const expired = sub.status === "expired" || sub.status === "refunded";
@@ -159,6 +168,7 @@ export default async function RadioPage({
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
+      <RememberRadio token={token} />
       {/* 孩子的星空: 视觉锚 + 已点亮星星 */}
       <div className="rounded-2xl bg-night starfield px-6 py-8 text-center text-paper">
         <p className="text-sm tracking-widest text-moon">亲 声 电 台</p>
@@ -189,6 +199,8 @@ export default async function RadioPage({
       <section className="mt-8">
         {tonight ? (
           <StoryCard token={token} story={tonight} tonight />
+        ) : instantPending ? (
+          <InstantFirstStarter token={token} childName={sub.childName} />
         ) : (
           <div className="rounded-2xl border border-star bg-night starfield p-6 text-center text-paper">
             {!unlocked ? (
@@ -260,6 +272,28 @@ export default async function RadioPage({
           <li>② 随时一键删除，云端录音样本与声音模型即时清除。</li>
           <li>③ 它只能念我们为孩子生成并安全审核过的故事，不提供任意文本朗读。</li>
         </ul>
+
+        {/* 七期 D3: 声音资产可见化 — 内容库里「用我的声音念」过的文章 */}
+        {articleAudios.length > 0 && (
+          <div className="mt-6 rounded-2xl border border-ink/10 bg-white p-4">
+            <p className="text-sm font-medium text-ink">用你的声音念过的文章</p>
+            <ul className="mt-3 space-y-2">
+              {articleAudios.map((a) => (
+                <li key={a.slug} className="text-sm">
+                  <Link
+                    href={`/articles/${a.category}/${a.slug}`}
+                    className="text-ink underline hover:text-night"
+                  >
+                    {a.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-ink-soft">
+              在<Link href="/articles" className="underline">内容库</Link>任何一篇文章里，都可以让你的声音念给孩子听（每天一篇）。
+            </p>
+          </div>
+        )}
       </section>
     </div>
   );

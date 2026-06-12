@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Download, Mic, Send, Share, Star, Trash2 } from "lucide-react";
 import VoiceRecorder from "@/components/voice-recorder";
+import { setRadioToken } from "@/lib/local-identity";
 
 export interface StoryView {
   date: string;
@@ -300,6 +302,69 @@ export function WeeklyPack({ token, available }: { token: string; available: boo
       )}
     </div>
   );
+}
+
+const INSTANT_GIVEUP_MS = 3 * 60_000;
+const INSTANT_POLL_MS = 8_000;
+
+/**
+ * 即时首晚生成 (七期 D1): trial 刚开通、一晚故事都没有时渲染。
+ * 挂载即 fire-and-forget 触发 /api/radio/instant-first (不 await 结果 —
+ * 生成约 1-2 分钟, 微信 webview 挂长 fetch 必被掐), 之后每 8s refresh 服务端组件;
+ * 故事文本落库后页面自然出现故事卡, 本组件随之卸载。
+ * 3 分钟封顶后降级为中性文案 (不说谎: 失败户由次日管线/19:00 前补跑兜底)。
+ */
+export function InstantFirstStarter({ token, childName }: { token: string; childName: string }) {
+  const router = useRouter();
+  const [gaveUp, setGaveUp] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/radio/instant-first", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => {});
+    const poll = setInterval(() => router.refresh(), INSTANT_POLL_MS);
+    const giveUp = setTimeout(() => setGaveUp(true), INSTANT_GIVEUP_MS);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(giveUp);
+    };
+    // 仅挂载时触发一次; token 在组件生命周期内不变
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="rounded-2xl border border-star bg-night starfield p-6 text-center text-paper">
+      {!gaveUp ? (
+        <>
+          <div className="flex items-end justify-center gap-1 h-10" aria-hidden>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={i}
+                className="wavebar w-1.5 rounded-full bg-star"
+                style={{ animationDelay: `${i * 0.2}s` }}
+              />
+            ))}
+          </div>
+          <p className="mt-3 font-display text-lg text-star-soft" aria-live="polite">
+            工坊正在为{childName}写第一晚的故事 🌙
+          </p>
+          <p className="mt-2 text-sm text-moon">大约 1-2 分钟，写好这页会自己亮起来，不用刷新。</p>
+        </>
+      ) : (
+        <p className="text-sm leading-relaxed text-moon">
+          工坊已收到{childName}的故事订单，最晚今晚 19:00 前送到这一页。
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** 打开电台页即把 token 记到本机 (失败静默) — 任何设备打开过一次, nav 就长出「我的电台」。 */
+export function RememberRadio({ token }: { token: string }) {
+  useEffect(() => setRadioToken(token), [token]);
+  return null;
 }
 
 /** 正式录音 (替换音色) + 一键删除声音 (信任承诺②, 显眼不折叠)。 */

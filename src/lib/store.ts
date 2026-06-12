@@ -297,6 +297,71 @@ export async function countActiveTrials(): Promise<number> {
   return subs.filter((s) => s.status === "trial").length;
 }
 
+// ── 即时首晚生成 (instant-first) ──
+
+/**
+ * 并发闸: 同一订户同时只允许一个即时生成在跑。
+ * 成功路径靠 10 分钟 TTL 自然过期; 失败路径必须 releaseInstantSlot 释放, 否则用户要干等 10 分钟。
+ */
+export async function claimInstantSlot(subId: string): Promise<boolean> {
+  const ok = await redis().set(`instant:${subId}`, "1", { nx: true, ex: 600 });
+  return ok === "OK";
+}
+
+export async function releaseInstantSlot(subId: string): Promise<void> {
+  await redis().del(`instant:${subId}`);
+}
+
+// ── 文章亲声朗读 (用我的声音念这篇) ──
+
+/** 每户每日 1 篇配额 (SETNX, 2 天 TTL 自清)。首次返回 true; 合成失败由调用方 release。 */
+export async function claimArticleSynthSlot(subId: string, date: string): Promise<boolean> {
+  const ok = await redis().set(`asynth-quota:${subId}:${date}`, "1", { nx: true, ex: 2 * 86400 });
+  return ok === "OK";
+}
+
+export async function releaseArticleSynthSlot(subId: string, date: string): Promise<void> {
+  await redis().del(`asynth-quota:${subId}:${date}`);
+}
+
+export interface ArticleAudio {
+  slug: string;
+  category: string;
+  title: string;
+  url: string;
+  createdAt: string; // ISO
+}
+
+/** 记录一篇已用订户音色念过的文章 (hash asynth:<subId>, field=slug)。 */
+export async function setArticleAudio(subId: string, entry: ArticleAudio): Promise<void> {
+  await redis().hset(`asynth:${subId}`, { [entry.slug]: JSON.stringify(entry) });
+}
+
+export async function getArticleAudio(subId: string, slug: string): Promise<ArticleAudio | null> {
+  const raw = await redis().hget(`asynth:${subId}`, slug);
+  if (!raw) return null;
+  try {
+    return (typeof raw === "string" ? JSON.parse(raw) : raw) as ArticleAudio;
+  } catch {
+    return null;
+  }
+}
+
+/** 该订户念过的全部文章, 新→旧。 */
+export async function listArticleAudios(subId: string): Promise<ArticleAudio[]> {
+  const h = await redis().hgetall(`asynth:${subId}`);
+  if (!h) return [];
+  const out: ArticleAudio[] = [];
+  for (const raw of Object.values(h)) {
+    try {
+      out.push((typeof raw === "string" ? JSON.parse(raw) : raw) as ArticleAudio);
+    } catch {
+      // 坏行跳过
+    }
+  }
+  return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
 // ── 管线摘要 + 全量备份 ──
 
 export async function setPipelineSummary(date: string, summary: Record<string, string>): Promise<void> {
