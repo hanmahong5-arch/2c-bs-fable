@@ -314,14 +314,28 @@ export async function releaseInstantSlot(subId: string): Promise<void> {
 
 // ── 文章亲声朗读 (用我的声音念这篇) ──
 
-/** 每户每日 1 篇配额 (SETNX, 2 天 TTL 自清)。首次返回 true; 合成失败由调用方 release。 */
-export async function claimArticleSynthSlot(subId: string, date: string): Promise<boolean> {
-  const ok = await redis().set(`asynth-quota:${subId}:${date}`, "1", { nx: true, ex: 2 * 86400 });
+/**
+ * 文章亲声朗读防滥用: in-flight 锁 (EX 600) 防并发 + 每日「已成功」标记 (合成成功才落)。
+ * 关键 (七期观测揪出的修正): 配额标记落在成功后 — 函数被 300s maxDuration 截杀时
+ * in-flight 锁 ≤10min 自过期、配额不被吞, 用户当天可重试。
+ * (旧版 claim-before 在 GPU 争用 timeout 下白吞配额且当天不可重试。)
+ */
+export async function claimArticleSynthLock(subId: string): Promise<boolean> {
+  const ok = await redis().set(`asynth-lock:${subId}`, "1", { nx: true, ex: 600 });
   return ok === "OK";
 }
 
-export async function releaseArticleSynthSlot(subId: string, date: string): Promise<void> {
-  await redis().del(`asynth-quota:${subId}:${date}`);
+export async function releaseArticleSynthLock(subId: string): Promise<void> {
+  await redis().del(`asynth-lock:${subId}`);
+}
+
+export async function hasArticleSynthedToday(subId: string, date: string): Promise<boolean> {
+  return (await redis().exists(`asynth-done:${subId}:${date}`)) === 1;
+}
+
+/** 合成成功后才调用 — 当日配额从此消耗。 */
+export async function markArticleSynthedToday(subId: string, date: string): Promise<void> {
+  await redis().set(`asynth-done:${subId}:${date}`, "1", { ex: 2 * 86400 });
 }
 
 export interface ArticleAudio {

@@ -4,10 +4,12 @@ import { putArticleAudio } from "@/lib/audio-storage";
 import { bjToday } from "@/lib/beijing";
 import {
   bumpFunnel,
-  claimArticleSynthSlot,
+  claimArticleSynthLock,
   getArticleAudio,
   getSubscriberByToken,
-  releaseArticleSynthSlot,
+  hasArticleSynthedToday,
+  markArticleSynthedToday,
+  releaseArticleSynthLock,
   setArticleAudio,
 } from "@/lib/store";
 import { synthPart } from "@/lib/story-gen";
@@ -19,7 +21,8 @@ import { synthPart } from "@/lib/story-gen";
  */
 export const maxDuration = 300;
 
-const MAX_CHARS = 800;
+// 实测: 800 字在 GPU 争用下逐段合成 >300s 被 maxDuration 截杀 → 降到 500 留余量 (~150-200s)
+const MAX_CHARS = 500;
 
 function fail(status: number, message: string) {
   return NextResponse.json({ error: message }, { status });
@@ -45,13 +48,17 @@ export async function POST(req: Request) {
   const article = await getArticle(category, slug); // 内部已做 slug 白名单校验
   if (!article) return fail(404, "这篇文章不存在。");
 
-  // 已念过 → 直接返回, 不耗配额
+  // 已念过 → 直接返回, 不耗配额/不占锁
   const existing = await getArticleAudio(sub.id, slug);
   if (existing) return NextResponse.json({ ok: true, url: existing.url, cached: true });
 
   const date = bjToday();
-  if (!(await claimArticleSynthSlot(sub.id, date))) {
+  if (await hasArticleSynthedToday(sub.id, date)) {
     return fail(429, "今天的一篇已用，明天再来——你的声音每天可以念一篇。");
+  }
+  // in-flight 锁: 防并发; 被 timeout 截杀也 ≤10min 自过期, 配额标记 (markArticleSynthedToday) 只在成功后落
+  if (!(await claimArticleSynthLock(sub.id))) {
+    return fail(429, "你的声音正在念另一篇，念完这篇再来试。");
   }
 
   try {
@@ -84,11 +91,12 @@ export async function POST(req: Request) {
       url,
       createdAt: new Date().toISOString(),
     });
+    await markArticleSynthedToday(sub.id, date); // 配额: 成功才落 (timeout 截杀则不落, 可重试)
+    await releaseArticleSynthLock(sub.id);
     await bumpFunnel(date, "asynth_ok").catch(() => {});
     return NextResponse.json({ ok: true, url, truncated });
   } catch (e) {
-    // 合成失败不吞当日配额
-    await releaseArticleSynthSlot(sub.id, date).catch(() => {});
+    await releaseArticleSynthLock(sub.id).catch(() => {});
     await bumpFunnel(date, "asynth_fail").catch(() => {});
     console.error(`[articles/synth] ${sub.id}/${slug} FAIL: ${(e as Error).message}`);
     return fail(502, "工坊这会儿忙不过来，稍后再试一次。");
