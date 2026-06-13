@@ -15,6 +15,7 @@
 import { del, list, put } from "@vercel/blob";
 import {
   clearPendingNote,
+  getFunnel,
   getStory,
   listActiveSubscribers,
   listStories,
@@ -26,7 +27,7 @@ import {
   type Subscriber,
 } from "../src/lib/store";
 import { putRadioAudio } from "../src/lib/audio-storage";
-import { bjDaysSince, bjToday, parseSerialState, type SerialState } from "../src/lib/beijing";
+import { bjDaysSince, bjHour, bjToday, parseSerialState, type SerialState } from "../src/lib/beijing";
 import { notify } from "../src/lib/ntfy";
 import { TOKEN, synthStory } from "./lib/story-gen";
 import { TRIAL_NIGHTS, generateFor, type RadioStoryOut } from "../src/lib/radio-story";
@@ -199,6 +200,23 @@ async function main(): Promise<void> {
   const bizLine = `触达率(近7晚) ${reachNum}/${reachDen}=${reachPct}% · 付费 ${paidCount} · 试用 ${trialCount}`;
   const isMonday = new Date(`${date}T12:00:00Z`).getUTCDay() === 1;
 
+  // 即时漏斗观测 (七期断点): 报昨日完整值, 仅 06:00 主跑发 (retry 08-18 跳过, 不重复刷屏)。
+  // instant_text 高 = 224s 贴顶在悄悄退化「即时音频→即时文字」; instant_fail = 空夜 (路由已即时响铃)。
+  let funnelLine = "";
+  if (bjHour() < 8) {
+    const yesterday = new Date(Date.parse(`${date}T00:00:00+08:00`) - 86400_000)
+      .toISOString()
+      .slice(0, 10);
+    try {
+      const f = await getFunnel(yesterday);
+      if (f.instant_ok + f.instant_text + f.instant_fail + f.asynth_ok + f.asynth_fail > 0) {
+        funnelLine = `昨日漏斗 · 即时首晚 ✓${f.instant_ok}/文字${f.instant_text}/失败${f.instant_fail} · 文章亲声 ✓${f.asynth_ok}/失败${f.asynth_fail}`;
+      }
+    } catch (e) {
+      console.error(`[radio] funnel stat FAIL: ${(e as Error).message}`);
+    }
+  }
+
   const summary = `订户 ${subs.length} · 生成 ${made} · 跳过 ${skipped} · 失败 ${failed} · 清理音频 ${prunedTotal} · 备份 ${backupOk ? "✓" : "✗"}`;
   try {
     await setPipelineSummary(date, {
@@ -209,12 +227,14 @@ async function main(): Promise<void> {
       reach: `${reachNum}/${reachDen}`,
       paid: String(paidCount),
       trial: String(trialCount),
+      ...(funnelLine ? { funnel: funnelLine } : {}),
       summary,
     });
   } catch (e) {
     console.error(`[radio] summary write FAIL: ${(e as Error).message}`);
   }
   const bodyLines = [summary, bizLine];
+  if (funnelLine) bodyLines.push(funnelLine);
   if (isMonday && perSub.length) bodyLines.push(`周报 · 各家触达: ${perSub.join(" / ")}`);
   if (failures.length) bodyLines.push(failures.join("\n").slice(0, 800));
   await notify(

@@ -362,6 +362,39 @@ export async function listArticleAudios(subId: string): Promise<ArticleAudio[]> 
   return out.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
+// ── 漏斗观测 (funnel telemetry) ──
+
+/**
+ * 即时漏斗逐日计数 (instant-first / 文章亲声朗读的 成功·降级·失败)。
+ * instant-first 实测 224s 贴 300s 上限 → 生产里到底有多少户从「即时音频」悄悄退化成
+ * 「即时文字」, 靠这组计数才可见; 管线 06:00 读昨日值进 ntfy 摘要。
+ */
+export type FunnelEvent =
+  | "instant_ok" // 第一晚: 文本+音频齐
+  | "instant_text" // 第一晚: 仅文本 (音频超时/失败, R5 2h 补跑兜底) — 降级非故障
+  | "instant_fail" // 第一晚: 文本都没写成 (空夜) — 高优先级告警
+  | "asynth_ok" // 文章亲声: 合成成功
+  | "asynth_fail"; // 文章亲声: 合成失败
+
+const FUNNEL_EVENTS: FunnelEvent[] = [
+  "instant_ok", "instant_text", "instant_fail", "asynth_ok", "asynth_fail",
+];
+const FUNNEL_TTL_SECONDS = 30 * 86400;
+
+export async function bumpFunnel(date: string, event: FunnelEvent): Promise<void> {
+  const r = redis();
+  const key = `funnel:${date}`;
+  await r.hincrby(key, event, 1);
+  await r.expire(key, FUNNEL_TTL_SECONDS);
+}
+
+export async function getFunnel(date: string): Promise<Record<FunnelEvent, number>> {
+  const h = await redis().hgetall(`funnel:${date}`);
+  const out = {} as Record<FunnelEvent, number>;
+  for (const e of FUNNEL_EVENTS) out[e] = h ? Number(h[e] ?? 0) || 0 : 0;
+  return out;
+}
+
 // ── 管线摘要 + 全量备份 ──
 
 export async function setPipelineSummary(date: string, summary: Record<string, string>): Promise<void> {

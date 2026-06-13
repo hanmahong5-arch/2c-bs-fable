@@ -3,6 +3,7 @@ import { getArticle } from "@/lib/articles";
 import { putArticleAudio } from "@/lib/audio-storage";
 import { bjToday } from "@/lib/beijing";
 import {
+  bumpFunnel,
   claimArticleSynthSlot,
   getArticleAudio,
   getSubscriberByToken,
@@ -83,10 +84,12 @@ export async function POST(req: Request) {
       url,
       createdAt: new Date().toISOString(),
     });
+    await bumpFunnel(date, "asynth_ok").catch(() => {});
     return NextResponse.json({ ok: true, url, truncated });
   } catch (e) {
     // 合成失败不吞当日配额
     await releaseArticleSynthSlot(sub.id, date).catch(() => {});
+    await bumpFunnel(date, "asynth_fail").catch(() => {});
     console.error(`[articles/synth] ${sub.id}/${slug} FAIL: ${(e as Error).message}`);
     return fail(502, "工坊这会儿忙不过来，稍后再试一次。");
   }

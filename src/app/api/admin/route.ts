@@ -3,6 +3,7 @@ import {
   createSubscriber,
   dumpAll,
   getDemoVoice,
+  getFunnel,
   getSubscriber,
   listAllSubscribers,
   listPendingOrders,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/store";
 import { deleteVoice } from "@/lib/cosy";
 import { deleteRadioFolder } from "@/lib/audio-storage";
+import { bjToday } from "@/lib/beijing";
 
 export const maxDuration = 60;
 
@@ -36,6 +38,7 @@ type AdminBody = {
   expiresAt?: string;
   days?: number;
   orderRaw?: string;
+  date?: string;
 };
 
 function fail(status: number, message: string) {
@@ -136,6 +139,11 @@ export async function POST(req: Request) {
         const expiresAt = new Date(base.getTime() + days * 86400_000).toISOString().slice(0, 10);
         await updateSubscriber(body.subId, { status: "active", expiresAt });
         return NextResponse.json({ subId: body.subId, expiresAt });
+      }
+      case "funnel": {
+        // 即时漏斗逐日观测 (默认今天): instant 成功/文字降级/空夜 + 文章亲声 成功/失败
+        const d = body.date ?? bjToday();
+        return NextResponse.json({ date: d, funnel: await getFunnel(d) });
       }
       case "dump": {
         return NextResponse.json(await dumpAll());

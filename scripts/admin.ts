@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     sub: "subId", demo: "demoId", voice: "voiceId", child: "childName",
     age: "age", prefs: "prefs", theme: "weeklyTheme", contact: "contact",
     status: "status", expires: "expiresAt", "order-raw": "orderRaw",
+    date: "date",
   };
   for (const [f, field] of Object.entries(map)) {
     const v = flag(f);
