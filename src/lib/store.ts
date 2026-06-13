@@ -415,6 +415,15 @@ export async function setPipelineSummary(date: string, summary: Record<string, s
   await redis().hset(`pipeline:${date}`, summary);
 }
 
+/** 当日管线运行摘要; 无 ranAt (那天一次都没跑成) 返回 null。Vercel heartbeat 据此判活。 */
+export async function getPipelineSummary(date: string): Promise<Record<string, string> | null> {
+  const h = await redis().hgetall(`pipeline:${date}`);
+  if (!h || !h.ranAt) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(h)) out[k] = str(v);
+  return out;
+}
+
 /** 全量 dump (admin/备份用): 所有订户 + 各自故事。 */
 export async function dumpAll(): Promise<Record<string, unknown>> {
   const subs = await listAllSubscribers();
