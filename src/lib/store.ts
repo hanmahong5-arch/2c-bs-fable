@@ -16,14 +16,16 @@
  */
 import { Redis } from "@upstash/redis";
 import { randomBytes } from "node:crypto";
+import { DEMO_TTL_SECONDS, FUNNEL_TTL_SECONDS } from "./constants";
+import { requireEnvAny } from "./env";
 
 let _redis: Redis | null = null;
 
 function redis(): Redis {
   if (_redis) return _redis;
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) throw new Error("Redis env missing: KV_REST_API_URL / KV_REST_API_TOKEN");
+  // 懒求值 + fast-fail 三要素 (见 env.ts); 缺 KV 配置时清晰报错而非中途 undefined。
+  const url = requireEnvAny("KV_REST_API_URL", "UPSTASH_REDIS_REST_URL");
+  const token = requireEnvAny("KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_TOKEN");
   _redis = new Redis({ url, token });
   return _redis;
 }
@@ -184,6 +186,19 @@ export async function listAllSubscribers(): Promise<Subscriber[]> {
   return subs;
 }
 
+/** sub:* 键计数 (容量护栏用: 不水合详情, 比 listAllSubscribers 轻)。 */
+export async function countSubscribers(): Promise<number> {
+  const r = redis();
+  let n = 0;
+  let cursor = "0";
+  do {
+    const [next, keys] = await r.scan(cursor, { match: "sub:*", count: 100 });
+    cursor = String(next);
+    n += keys.length;
+  } while (cursor !== "0");
+  return n;
+}
+
 // ── 订单 (爱发电) ──
 
 /** SETNX 幂等闸: 首见返回 true, 重复 webhook 返回 false。 */
@@ -272,8 +287,6 @@ export async function countStarred(subId: string): Promise<number> {
 
 // ── demo 音色复用 (试听 → 订阅) ──
 
-const DEMO_TTL_SECONDS = 30 * 24 * 3600;
-
 export async function rememberDemoVoice(demoId: string, voiceId: string): Promise<void> {
   await redis().set(`demo:${demoId}`, voiceId, { ex: DEMO_TTL_SECONDS });
 }
@@ -290,6 +303,11 @@ export async function getDemoVoice(demoId: string): Promise<string | null> {
 export async function claimTrialSlot(key: string): Promise<boolean> {
   const ok = await redis().set(`trial:${key}`, "1", { nx: true });
   return ok === "OK";
+}
+
+/** 回滚防薅槽: claimTrialSlot 之后的步骤失败时调用, 让这段 demo / 联系方式可重试 (否则槽被烧却没建出 sub)。 */
+export async function releaseTrialSlot(key: string): Promise<void> {
+  await redis().del(`trial:${key}`);
 }
 
 export async function countActiveTrials(): Promise<number> {
@@ -379,21 +397,26 @@ export async function listArticleAudios(subId: string): Promise<ArticleAudio[]> 
 // ── 漏斗观测 (funnel telemetry) ──
 
 /**
- * 即时漏斗逐日计数 (instant-first / 文章亲声朗读的 成功·降级·失败)。
+ * 即时漏斗逐日计数 (instant-first / 文章亲声朗读的 开始·成功·降级·失败)。
  * instant-first 实测 224s 贴 300s 上限 → 生产里到底有多少户从「即时音频」悄悄退化成
  * 「即时文字」, 靠这组计数才可见; 管线 06:00 读昨日值进 ntfy 摘要。
+ * started 是盲区探针: 风险合成「前」先计 started, 成功计 ok/text/fail;
+ * started − ok − text − fail (instant) / started − ok − fail (asynth) = 被 300s 硬截杀、
+ * 连 catch 都没跑到的次数 — 不需后台扫描任务即可测出这块盲区。
  */
 export type FunnelEvent =
+  | "instant_started" // 第一晚: 已领锁、即将生成 (盲区分母)
   | "instant_ok" // 第一晚: 文本+音频齐
   | "instant_text" // 第一晚: 仅文本 (音频超时/失败, R5 2h 补跑兜底) — 降级非故障
   | "instant_fail" // 第一晚: 文本都没写成 (空夜) — 高优先级告警
+  | "asynth_started" // 文章亲声: 已领锁、即将合成 (盲区分母)
   | "asynth_ok" // 文章亲声: 合成成功
   | "asynth_fail"; // 文章亲声: 合成失败
 
 const FUNNEL_EVENTS: FunnelEvent[] = [
-  "instant_ok", "instant_text", "instant_fail", "asynth_ok", "asynth_fail",
+  "instant_started", "instant_ok", "instant_text", "instant_fail",
+  "asynth_started", "asynth_ok", "asynth_fail",
 ];
-const FUNNEL_TTL_SECONDS = 30 * 86400;
 
 export async function bumpFunnel(date: string, event: FunnelEvent): Promise<void> {
   const r = redis();

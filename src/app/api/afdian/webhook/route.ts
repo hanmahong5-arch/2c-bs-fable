@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { queryOrder, type NormalizedOrder } from "@/lib/payments/afdian";
 import {
   claimOrder,
+  countSubscribers,
   createSubscriber,
   getDemoVoice,
   getSubscriber,
@@ -89,6 +90,17 @@ export async function POST(req: Request) {
     }
 
     if (demoVoiceId) {
+      // 容量护栏 (item 20): 用户已付款 → 到帽不静默写失败, 转人工 (pending + 高优响铃), 扩容后 bind-order
+      const hardCap = Number(process.env.SUB_HARD_CAP ?? "30");
+      if ((await countSubscribers()) >= hardCap) {
+        await pushPendingOrder({ ...order, demoVoiceId, capReached: true, receivedAt: new Date().toISOString() });
+        await notify(
+          "⚠️ 已付款但订户已达容量上限",
+          `订单 ${order.outTradeNo} ¥${order.totalAmount} 已付款，但订户数已达 ${hardCap} 上限、无法自动建档。扩容后用 admin bind-order 手动开通（音色 ${demoVoiceId}）。`,
+          "high",
+        );
+        return OK;
+      }
       // 只有试听没开 trial 的直接付费: 建档 (孩子信息缺, owner 补)
       const newSub = await createSubscriber({
         childName: "",

@@ -1,17 +1,13 @@
-import { NextResponse } from "next/server";
 import { getSubscriberByToken, updateSubscriber } from "@/lib/store";
 import { deleteVoice, registerVoice } from "@/lib/cosy";
+import { fail, ok } from "@/lib/api";
+import { MAX_UPLOAD_BYTES } from "@/lib/constants";
 
 // 注册含 whisper 转写 (与合成共用 GPU 串行锁), 窗口同 voice-demo
 export const maxDuration = 90;
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 // 质检字数下限: 转写太短说明样本里有效语音不足, 克隆相似度会差
 const MIN_PROMPT_CHARS = 6;
-
-function fail(status: number, message: string) {
-  return NextResponse.json({ error: message }, { status });
-}
 
 /** 订户正式录音: 替换电台音色 (新声成功后才删旧声, 失败不伤现状)。 */
 export async function POST(req: Request) {
@@ -63,5 +59,5 @@ export async function POST(req: Request) {
       console.error("old voice cleanup failed", oldVoiceId, e);
     }
   }
-  return NextResponse.json({ ok: true });
+  return ok({ ok: true });
 }

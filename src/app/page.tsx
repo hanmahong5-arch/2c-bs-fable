@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BookOpenText, Mic, Moon, ShieldCheck, Sparkles, Volume2 } from "lucide-react";
 import { getStories } from "@/lib/stories";
 import { listAllSubscribers } from "@/lib/store";
+import NightCard from "@/components/ui/NightCard";
 
 // 创始家庭余量每小时刷新一次 (真实余量, 不做假稀缺)
 export const revalidate = 3600;
@@ -47,16 +48,16 @@ export default async function Home() {
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link
-              href="/stories"
+              href="/custom"
               className="rounded-full bg-star px-8 py-3 font-medium text-night hover:bg-star-soft transition-colors"
             >
-              开始听故事
+              用我的声音讲故事
             </Link>
             <Link
-              href="/custom"
+              href="/stories"
               className="rounded-full border border-moon/40 px-8 py-3 text-moon hover:border-star hover:text-star transition-colors"
             >
-              定制专属故事
+              先听免费故事
             </Link>
           </div>
         </div>
@@ -90,7 +91,7 @@ export default async function Home() {
 
           {/* 定价: 锚定定制绘本, 不与任何故事 App 比价 */}
           <div className="mt-10 grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-night starfield p-6 text-paper">
+            <NightCard className="p-6">
               <p className="text-sm text-moon">创始家庭 · 限 {FOUNDING_CAP} 席</p>
               <p className="mt-2 font-display text-3xl text-star-soft">
                 ¥299<span className="text-base text-moon"> / 年</span>
@@ -103,7 +104,7 @@ export default async function Home() {
                   </>
                 )}
               </p>
-            </div>
+            </NightCard>
             <div className="rounded-2xl border border-ink/10 bg-white p-6">
               <p className="text-sm text-ink-soft">连载一年</p>
               <p className="mt-2 font-display text-3xl">
@@ -113,9 +114,9 @@ export default async function Home() {
                 一天一块钱，365 个为 TA 新写的故事。一本定制绘本的价钱（¥99–199），只换一个故事；这里每晚都是新的。
               </p>
             </div>
-            <div className="rounded-2xl border border-ink/10 bg-white p-6">
-              <p className="text-sm text-ink-soft">先试试</p>
-              <p className="mt-2 font-display text-3xl">
+            <div className="rounded-2xl border-2 border-star bg-star-soft/30 p-6">
+              <p className="text-sm font-medium text-ink">先试试 · 0 元入口</p>
+              <p className="mt-2 font-display text-3xl text-night">
                 3 晚<span className="text-base text-ink-soft"> 免费</span>
               </p>
               <p className="mt-2 text-sm leading-relaxed text-ink-soft">

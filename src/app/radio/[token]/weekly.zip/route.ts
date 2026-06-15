@@ -24,14 +24,31 @@ export async function GET(
   }
 
   const files: Record<string, Uint8Array> = {};
+  const missing: string[] = [];
   for (const s of stories) {
-    const res = await fetch(s.audioUrl);
-    if (!res.ok) continue;
-    const safeTitle = s.title.replace(/[\\/:*?"<>|]/g, "").slice(0, 24);
-    files[`${s.date} ${safeTitle}.mp3`] = new Uint8Array(await res.arrayBuffer());
+    let fetched = false;
+    try {
+      const res = await fetch(s.audioUrl);
+      if (res.ok) {
+        const safeTitle = s.title.replace(/[\\/:*?"<>|]/g, "").slice(0, 24);
+        files[`${s.date} ${safeTitle}.mp3`] = new Uint8Array(await res.arrayBuffer());
+        fetched = true;
+      }
+    } catch {
+      // 网络 / blob 异常 → 计入缺失, 不静默吞
+    }
+    if (!fetched) missing.push(`${s.date} ${s.title}`);
   }
   if (Object.keys(files).length === 0) {
     return new Response("音频暂时取不到，请稍后再试", { status: 502 });
+  }
+  // 部分失败不再静默 (item 22): zip 内附 MISSING.txt 列出缺哪几晚, 否则用户拿到缺斤少两的包不自知
+  if (missing.length > 0) {
+    const note =
+      `本周有 ${missing.length} 晚的音频这次没能打进来（可能正在生成，或已过 14 天归档）：\n` +
+      missing.map((m) => `· ${m}`).join("\n") +
+      `\n\n过一会儿再下载一次通常就齐了；故事文字在电台页一直都在。`;
+    files["MISSING.txt"] = new TextEncoder().encode(note);
   }
 
   // 下载即触达: 产品主动把收听推离网页 (故事机), 对本周最新一晚置位
@@ -43,6 +60,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${sub.id}-weekly.zip"`,
+      "X-Missing-Count": String(missing.length),
       "X-Robots-Tag": "noindex, nofollow",
       "Cache-Control": "no-store",
     },

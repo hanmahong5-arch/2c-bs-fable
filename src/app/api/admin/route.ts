@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   createSubscriber,
   dumpAll,
@@ -16,6 +15,7 @@ import {
 import { deleteVoice } from "@/lib/cosy";
 import { deleteRadioFolder } from "@/lib/audio-storage";
 import { bjToday } from "@/lib/beijing";
+import { fail, ok, readJson } from "@/lib/api";
 
 export const maxDuration = 60;
 
@@ -41,10 +41,6 @@ type AdminBody = {
   date?: string;
 };
 
-function fail(status: number, message: string) {
-  return NextResponse.json({ error: message }, { status });
-}
-
 export async function POST(req: Request) {
   const adminKey = process.env.ADMIN_KEY;
   if (!adminKey) return fail(500, "ADMIN_KEY not configured");
@@ -52,12 +48,8 @@ export async function POST(req: Request) {
     return fail(401, "unauthorized");
   }
 
-  let body: AdminBody;
-  try {
-    body = (await req.json()) as AdminBody;
-  } catch {
-    return fail(400, "invalid json");
-  }
+  const body = await readJson<AdminBody>(req);
+  if (!body) return fail(400, "invalid json");
 
   try {
     switch (body.action) {
@@ -82,7 +74,7 @@ export async function POST(req: Request) {
           expiresAt,
           contact: body.contact ?? "",
         });
-        return NextResponse.json({ sub, radioUrl: `https://fable.xin/radio/${sub.token}` });
+        return ok({ sub, radioUrl: `https://fable.xin/radio/${sub.token}` });
       }
       case "extend": {
         if (!body.subId) return fail(400, "subId required");
@@ -93,17 +85,17 @@ export async function POST(req: Request) {
           .toISOString()
           .slice(0, 10);
         await updateSubscriber(body.subId, { expiresAt, status: "active" });
-        return NextResponse.json({ subId: body.subId, expiresAt });
+        return ok({ subId: body.subId, expiresAt });
       }
       case "rotate-token": {
         if (!body.subId) return fail(400, "subId required");
         const token = await rotateToken(body.subId);
-        return NextResponse.json({ subId: body.subId, radioUrl: `https://fable.xin/radio/${token}` });
+        return ok({ subId: body.subId, radioUrl: `https://fable.xin/radio/${token}` });
       }
       case "set-voice": {
         if (!body.subId || !body.voiceId) return fail(400, "subId + voiceId required");
         await updateSubscriber(body.subId, { voiceId: body.voiceId });
-        return NextResponse.json({ subId: body.subId, voiceId: body.voiceId });
+        return ok({ subId: body.subId, voiceId: body.voiceId });
       }
       case "revoke": {
         // 彻底撤销: 删 R5 音色 + 删 Blob 音频目录 + 换 audioKey + 标 expired
@@ -113,11 +105,11 @@ export async function POST(req: Request) {
         if (sub.voiceId) await deleteVoice(sub.voiceId);
         const removed = await deleteRadioFolder(sub.audioKey);
         await updateSubscriber(body.subId, { status: "expired", voiceId: "", audioKey: newAudioKey() });
-        return NextResponse.json({ subId: body.subId, audioRemoved: removed });
+        return ok({ subId: body.subId, audioRemoved: removed });
       }
       case "list": {
         const subs = await listAllSubscribers();
-        return NextResponse.json({
+        return ok({
           count: subs.length,
           subs: subs.map((s) => ({
             id: s.id, childName: s.childName, status: s.status, expiresAt: s.expiresAt,
@@ -126,7 +118,7 @@ export async function POST(req: Request) {
         });
       }
       case "pending-orders": {
-        return NextResponse.json({ orders: await listPendingOrders() });
+        return ok({ orders: await listPendingOrders() });
       }
       case "bind-order": {
         // remark 匹配失败的订单, owner 核对爱发电后台后手工绑到订户
@@ -138,15 +130,15 @@ export async function POST(req: Request) {
         const base = new Date(sub.expiresAt) > new Date() ? new Date(sub.expiresAt) : new Date();
         const expiresAt = new Date(base.getTime() + days * 86400_000).toISOString().slice(0, 10);
         await updateSubscriber(body.subId, { status: "active", expiresAt });
-        return NextResponse.json({ subId: body.subId, expiresAt });
+        return ok({ subId: body.subId, expiresAt });
       }
       case "funnel": {
         // 即时漏斗逐日观测 (默认今天): instant 成功/文字降级/空夜 + 文章亲声 成功/失败
         const d = body.date ?? bjToday();
-        return NextResponse.json({ date: d, funnel: await getFunnel(d) });
+        return ok({ date: d, funnel: await getFunnel(d) });
       }
       case "dump": {
-        return NextResponse.json(await dumpAll());
+        return ok(await dumpAll());
       }
       default:
         return fail(400, `unknown action '${body.action}'`);

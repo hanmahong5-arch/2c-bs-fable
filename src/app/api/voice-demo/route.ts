@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { rememberDemoVoice } from "@/lib/store";
+import { fail, ok } from "@/lib/api";
+import { MAX_UPLOAD_BYTES } from "@/lib/constants";
 
 // 同步流全程 (上传→克隆登记→合成→存 Blob) 需要的窗口; Fluid compute 下 hobby 可到 90s
 export const maxDuration = 90;
@@ -12,7 +13,6 @@ const DEMO_TEXT =
   "今晚我用自己的声音，给你讲一个只属于我们俩的睡前故事。" +
   "小星星都听好了，故事要开始啦。做个好梦，我爱你。";
 
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // Vercel 请求体上限 4.5MB, 留余量
 const REGISTER_TIMEOUT_MS = 45_000; // R5 侧含 whisper 转写 (与合成共用串行锁)
 const SYNTH_TIMEOUT_MS = 40_000;
 
@@ -26,10 +26,6 @@ const ALLOWED_ORIGINS = new Set([
 
 const BUSY_MESSAGE =
   "朗读引擎这会儿正忙（可能在生成今晚的新故事），请过两分钟再试一次。";
-
-function fail(status: number, message: string) {
-  return NextResponse.json({ error: message }, { status });
-}
 
 export async function POST(req: Request) {
   const origin = req.headers.get("origin");
@@ -139,5 +135,5 @@ export async function POST(req: Request) {
     contentType: "audio/mpeg",
   });
 
-  return NextResponse.json({ demoId, url: blob.url });
+  return ok({ demoId, url: blob.url });
 }

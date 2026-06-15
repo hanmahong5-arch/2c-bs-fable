@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Share2, Check, Mic, Sparkles } from "lucide-react";
+import AudioPlayer from "@/components/AudioPlayer";
 
 const ID_RE = /^[a-f0-9]{16}$/;
 
@@ -49,7 +50,7 @@ export default function DemoPlayer({ id }: { id: string }) {
 
   return (
     <div className="bg-night starfield text-paper">
-      <div className="mx-auto max-w-xl px-5 py-16 text-center min-h-[70vh] flex flex-col justify-center">
+      <div className="mx-auto max-w-xl px-5 pt-16 pb-[calc(4rem_+_env(safe-area-inset-bottom))] text-center min-h-[70vh] flex flex-col justify-center">
         <p className="text-moon text-sm tracking-widest">亲 声 试 听</p>
         <h1 className="font-display text-3xl mt-3 leading-snug">
           听，这是你的声音
@@ -57,13 +58,11 @@ export default function DemoPlayer({ id }: { id: string }) {
           在给孩子讲故事
         </h1>
 
-        <div className="mt-10">
-          { }
-          <audio
+        <div className="mt-10 text-left">
+          <AudioPlayer
             src={src}
-            controls
-            preload="metadata"
-            className="w-full"
+            title="你的声音试听"
+            label="你的声音 · 亲声试听"
             onError={() => setMissing(true)}
           />
         </div>

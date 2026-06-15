@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Download, Mic, Send, Share, Star, Trash2 } from "lucide-react";
 import VoiceRecorder from "@/components/voice-recorder";
+import AudioPlayer from "@/components/AudioPlayer";
 import { setRadioToken } from "@/lib/local-identity";
+import { MAX_NOTE, MSG_NETWORK } from "@/lib/constants";
 
 export interface StoryView {
   date: string;
@@ -22,15 +24,33 @@ export function StoryCard({
   token,
   story,
   tonight,
+  pendingAudio,
 }: {
   token: string;
   story: StoryView;
   tonight?: boolean;
+  pendingAudio?: boolean;
 }) {
+  const router = useRouter();
   const [starred, setStarred] = useState(story.starred);
   const [open, setOpen] = useState(tonight ?? false);
   const [busy, setBusy] = useState(false);
   const reported = useRef(false);
+
+  // 即时首晚: 文本已落库、音频后台合成中 → 限时轮询自动刷出音频 (≤~96s, 防永久轮询)
+  useEffect(() => {
+    if (!pendingAudio || story.audioUrl) return;
+    let n = 0;
+    const t = setInterval(() => {
+      n += 1;
+      if (n > 12) {
+        clearInterval(t);
+        return;
+      }
+      router.refresh();
+    }, 8_000);
+    return () => clearInterval(t);
+  }, [pendingAudio, story.audioUrl, router]);
 
   // D2 触达遥测: 首次播放上报一次 (fire-and-forget, 失败静默 — 不打扰睡前)
   const reportPlay = () => {
@@ -89,7 +109,22 @@ export function StoryCard({
             </p>
           )}
           {story.audioUrl ? (
-            <audio src={story.audioUrl} controls preload="metadata" className="w-full" onPlay={reportPlay} />
+            <AudioPlayer src={story.audioUrl} title={story.title} onPlay={reportPlay} />
+          ) : pendingAudio ? (
+            <div className="text-center">
+              <div className="flex h-8 items-end justify-center gap-1" aria-hidden>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <span
+                    key={i}
+                    className="wavebar w-1.5 rounded-full bg-star"
+                    style={{ animationDelay: `${i * 0.18}s` }}
+                  />
+                ))}
+              </div>
+              <p className="mt-2 text-sm text-moon" aria-live="polite">
+                文字已写好啦，正在用你的声音念，音频稍后自动出现在这里（不用刷新）。
+              </p>
+            </div>
           ) : (
             <p className={`text-sm ${tonight ? "text-moon" : "text-ink-soft"}`}>
               {story.archived
@@ -126,8 +161,6 @@ export function StoryCard({
     </div>
   );
 }
-
-const MAX_NOTE = 50;
 
 /**
  * 「给工坊捎句话」(D1 闭环传感器): 家长捎孩子今天的近况, 明晚故事织入。
@@ -167,7 +200,7 @@ export function NoteBox({
       }
       setSent(true);
     } catch {
-      setError("没捎出去，请稍后再试。");
+      setError(MSG_NETWORK);
     } finally {
       setBusy(false);
     }
@@ -195,9 +228,12 @@ export function NoteBox({
         </p>
       ) : (
         <>
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">{prompt}</p>
+          <label htmlFor="radio-note" className="mt-2 block text-sm leading-relaxed text-ink-soft">
+            {prompt}
+          </label>
           <div className="mt-3 flex items-start gap-2">
             <textarea
+              id="radio-note"
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE))}
               maxLength={MAX_NOTE}
@@ -281,6 +317,7 @@ export function WeeklyPack({ token, available }: { token: string; available: boo
         {available ? (
           <a
             href={`/radio/${token}/weekly.zip`}
+            download
             className="rounded-full bg-night px-5 py-2 text-sm text-star hover:bg-night-deep transition-colors"
           >
             下载 zip
@@ -306,6 +343,7 @@ export function WeeklyPack({ token, available }: { token: string; available: boo
 
 const INSTANT_GIVEUP_MS = 3 * 60_000;
 const INSTANT_POLL_MS = 8_000;
+const INSTANT_STAGE2_MS = 60_000; // ~60s 后从「写故事」切到「用你的声音念」
 
 /**
  * 即时首晚生成 (七期 D1): trial 刚开通、一晚故事都没有时渲染。
@@ -316,6 +354,7 @@ const INSTANT_POLL_MS = 8_000;
  */
 export function InstantFirstStarter({ token, childName }: { token: string; childName: string }) {
   const router = useRouter();
+  const [stage, setStage] = useState<0 | 1>(0);
   const [gaveUp, setGaveUp] = useState(false);
 
   useEffect(() => {
@@ -325,9 +364,11 @@ export function InstantFirstStarter({ token, childName }: { token: string; child
       body: JSON.stringify({ token }),
     }).catch(() => {});
     const poll = setInterval(() => router.refresh(), INSTANT_POLL_MS);
+    const toStage2 = setTimeout(() => setStage(1), INSTANT_STAGE2_MS);
     const giveUp = setTimeout(() => setGaveUp(true), INSTANT_GIVEUP_MS);
     return () => {
       clearInterval(poll);
+      clearTimeout(toStage2);
       clearTimeout(giveUp);
     };
     // 仅挂载时触发一次; token 在组件生命周期内不变
@@ -348,13 +389,20 @@ export function InstantFirstStarter({ token, childName }: { token: string; child
             ))}
           </div>
           <p className="mt-3 font-display text-lg text-star-soft" aria-live="polite">
-            工坊正在为{childName}写第一晚的故事 🌙
+            {stage === 0
+              ? `正在为${childName}写第一晚的故事…`
+              : `正在用你的声音念给${childName}…`}
           </p>
-          <p className="mt-2 text-sm text-moon">大约 1-2 分钟，写好这页会自己亮起来，不用刷新。</p>
+          <p className="mt-2 text-sm text-moon">
+            {stage === 0
+              ? "大约 1-2 分钟，写好这页会自己亮起来，不用刷新。"
+              : "故事已经写好，正在合成你声音的音频，马上就来。"}
+          </p>
         </>
       ) : (
         <p className="text-sm leading-relaxed text-moon">
-          工坊已收到{childName}的故事订单，最晚今晚 19:00 前送到这一页。
+          工坊已收到{childName}的故事订单，最晚今晚 19:00 前会送到这一页。
+          可以先在下方「我的声音」确认录音，或稍后回来刷新看看。
         </p>
       )}
     </div>

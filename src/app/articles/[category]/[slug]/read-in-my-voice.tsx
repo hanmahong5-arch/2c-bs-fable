@@ -4,6 +4,9 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Mic, Sparkles } from "lucide-react";
 import { getRadioToken } from "@/lib/local-identity";
+import AudioPlayer from "@/components/AudioPlayer";
+import StarCard from "@/components/ui/StarCard";
+import { ARTICLE_SYNTH_MAX_CHARS, MSG_BUSY, MSG_NETWORK } from "@/lib/constants";
 
 type Phase = "idle" | "working" | "done" | "error";
 
@@ -24,7 +27,7 @@ export default function ReadInMyVoice({ category, slug }: { category: string; sl
   // 无电台 → 引流 (本件的真正商业价值: 万篇内容页 → 录音漏斗)
   if (!token) {
     return (
-      <div className="mt-8 rounded-2xl border border-star bg-star-soft/30 p-5">
+      <StarCard className="mt-8 p-5">
         <p className="font-medium text-ink">想用自己的声音念这篇给孩子听？</p>
         <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
           录 10 秒你的声音，就能让「你自己」来念——先免费试听一段。
@@ -36,7 +39,7 @@ export default function ReadInMyVoice({ category, slug }: { category: string; sl
           <Mic size={15} aria-hidden />
           先免费录一段 →
         </Link>
-      </div>
+      </StarCard>
     );
   }
 
@@ -54,7 +57,7 @@ export default function ReadInMyVoice({ category, slug }: { category: string; sl
         | { ok?: boolean; url?: string; truncated?: boolean; error?: string }
         | null;
       if (!res.ok || !data?.url) {
-        setError(data?.error ?? "工坊这会儿忙不过来，稍后再试一次。");
+        setError(data?.error ?? MSG_BUSY);
         setPhase("error");
         return;
       }
@@ -62,24 +65,37 @@ export default function ReadInMyVoice({ category, slug }: { category: string; sl
       setTruncated(Boolean(data.truncated));
       setPhase("done");
     } catch {
-      setError("网络不太稳定，请重试一次。");
+      setError(MSG_NETWORK);
       setPhase("error");
     }
   };
 
   return (
-    <div className="mt-8 rounded-2xl border border-star bg-star-soft/30 p-5">
+    <StarCard className="mt-8 p-5">
       {phase === "done" ? (
         <>
           <p className="font-medium text-ink">✓ 你的声音念的这篇</p>
           {truncated && (
-            <p className="mt-1 text-xs text-ink-soft">这篇比较长，为你念的是精华版。</p>
+            <p className="mt-1 text-xs text-ink-soft">
+              为你念了精华版（约 {ARTICLE_SYNTH_MAX_CHARS} 字），完整文章在上方文字。
+            </p>
           )}
-          <audio src={url} controls preload="metadata" className="mt-3 w-full" />
+          <div className="mt-3">
+            <AudioPlayer src={url} title="你的声音念的这篇" label="你的声音念的这篇" />
+          </div>
         </>
       ) : phase === "working" ? (
-        <div className="text-center py-2">
-          <p className="font-medium text-ink" aria-live="polite">
+        <div className="py-2 text-center">
+          <div className="flex h-8 items-end justify-center gap-1" aria-hidden>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={i}
+                className="wavebar w-1.5 rounded-full bg-night"
+                style={{ animationDelay: `${i * 0.18}s` }}
+              />
+            ))}
+          </div>
+          <p className="mt-3 font-medium text-ink" aria-live="polite">
             工坊正在用你的声音念这篇（约 1-2 分钟）…
           </p>
           <p className="mt-1.5 text-sm text-ink-soft">别关页面，念好就出现在这里。</p>
@@ -101,6 +117,6 @@ export default function ReadInMyVoice({ category, slug }: { category: string; sl
           )}
         </>
       )}
-    </div>
+    </StarCard>
   );
 }

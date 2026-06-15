@@ -14,7 +14,10 @@ export default function MyRadioLink() {
   const token = useSyncExternalStore(noopSubscribe, getRadioToken, () => "");
   if (!token) return null;
   return (
-    <Link href={`/radio/${token}`} className="hover:text-star transition-colors">
+    <Link
+      href={`/radio/${token}`}
+      className="inline-flex min-h-11 items-center py-2 hover:text-star transition-colors"
+    >
       🌙 我的电台
     </Link>
   );

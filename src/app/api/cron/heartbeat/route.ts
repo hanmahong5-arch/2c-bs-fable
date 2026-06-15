@@ -1,7 +1,30 @@
 import { NextResponse } from "next/server";
-import { getPipelineSummary } from "@/lib/store";
+import { getFunnel, getPipelineSummary } from "@/lib/store";
 import { bjToday } from "@/lib/beijing";
 import { notify } from "@/lib/ntfy";
+
+/** 北京时间昨天 YYYY-MM-DD (即时漏斗盲区看昨日完整一天)。 */
+function bjYesterday(): string {
+  return new Date(Date.parse(`${bjToday()}T00:00:00+08:00`) - 86400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * 即时漏斗盲区 (item 19): started − 各结局 = 被 300s maxDuration 硬截杀、连 catch 都没跑到的次数。
+ * 只读不告警 (heartbeat 管 liveness, 不与管线的 correctness ntfy 重叠); owner curl 即可看。
+ */
+async function blindSpot(date: string) {
+  try {
+    const f = await getFunnel(date);
+    return {
+      date,
+      instantSilentKills: Math.max(0, f.instant_started - f.instant_ok - f.instant_text - f.instant_fail),
+      asynthSilentKills: Math.max(0, f.asynth_started - f.asynth_ok - f.asynth_fail),
+      funnel: f,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 管线 dead-man's switch (Vercel Cron, 每天 09:00 北京 = 01:00 UTC)。
@@ -23,6 +46,8 @@ export async function GET(req: Request) {
   }
   const dry = new URL(req.url).searchParams.get("dry") === "1";
   const today = bjToday();
+  // 即时漏斗盲区 (item 19): 昨日 started − 各结局, 只读上报不告警
+  const blind = await blindSpot(bjYesterday());
 
   let summary: Record<string, string> | null;
   try {
@@ -32,11 +57,11 @@ export async function GET(req: Request) {
     if (!dry) {
       await notify("⚠️ 心跳: Vercel 读不到 Upstash", (e as Error).message.slice(0, 200), "high");
     }
-    return NextResponse.json({ ok: false, error: "upstash unreachable from vercel" });
+    return NextResponse.json({ ok: false, error: "upstash unreachable from vercel", blindSpot: blind });
   }
 
   if (summary?.ranAt) {
-    return NextResponse.json({ ok: true, date: today, ranAt: summary.ranAt, summary: summary.summary ?? "" });
+    return NextResponse.json({ ok: true, date: today, ranAt: summary.ranAt, summary: summary.summary ?? "", blindSpot: blind });
   }
 
   const msg =
@@ -47,5 +72,5 @@ export async function GET(req: Request) {
   if (!dry) {
     await notify("⚠️ 亲声管线今晨未运行", msg, "high");
   }
-  return NextResponse.json({ ok: false, alerted: !dry, date: today, message: msg });
+  return NextResponse.json({ ok: false, alerted: !dry, date: today, message: msg, blindSpot: blind });
 }

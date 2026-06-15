@@ -1,8 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Analytics } from "@vercel/analytics/react";
 import MyRadioLink from "@/components/my-radio-link";
 import "./globals.css";
+
+// viewportFit:cover 启用 env(safe-area-inset-*) (微信工具条 / iOS 手势条不遮内容)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://fable.xin"),
@@ -37,31 +44,37 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="min-h-screen flex flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-star focus:px-5 focus:py-2 focus:font-medium focus:text-night"
+        >
+          跳到正文
+        </a>
         <header className="bg-night starfield text-paper">
           <nav className="mx-auto max-w-5xl px-5 py-4 flex items-center justify-between">
-            <Link href="/" className="font-display text-xl text-star">
+            <Link href="/" className="inline-flex min-h-11 items-center font-display text-xl text-star">
               寓言星球
             </Link>
-            <div className="flex gap-6 text-sm text-moon">
-              <Link href="/stories" className="hover:text-star transition-colors">
+            <div className="flex items-center gap-4 text-sm text-moon sm:gap-6">
+              <Link href="/stories" className="inline-flex min-h-11 items-center py-2 hover:text-star transition-colors">
                 故事库
               </Link>
-              <Link href="/articles" className="hover:text-star transition-colors">
+              <Link href="/articles" className="inline-flex min-h-11 items-center py-2 hover:text-star transition-colors">
                 内容库
               </Link>
-              <Link href="/custom" className="hover:text-star transition-colors">
+              <Link href="/custom" className="inline-flex min-h-11 items-center py-2 hover:text-star transition-colors">
                 定制故事
               </Link>
-              <Link href="/about" className="hover:text-star transition-colors">
+              <Link href="/about" className="inline-flex min-h-11 items-center py-2 hover:text-star transition-colors">
                 关于
               </Link>
               <MyRadioLink />
             </div>
           </nav>
         </header>
-        <main className="flex-1">{children}</main>
+        <main id="main" className="flex-1">{children}</main>
         <footer className="bg-night-deep text-moon text-sm">
-          <div className="mx-auto max-w-5xl px-5 py-8 space-y-2">
+          <div className="mx-auto max-w-5xl px-5 pt-8 pb-[calc(2rem_+_env(safe-area-inset-bottom))] space-y-2">
             <p>
               寓言星球 fable.xin — 本站故事由人工智能辅助创作，经自动安全过滤与人工抽查，朗读音频由自研「亲声工坊」情感语音引擎合成。
             </p>

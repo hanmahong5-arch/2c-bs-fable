@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, Square, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { setDemoId } from "@/lib/local-identity";
+import AudioPlayer from "@/components/AudioPlayer";
+import NightCard from "@/components/ui/NightCard";
+import { MAX_UPLOAD_BYTES, MSG_GENERIC, MSG_NETWORK } from "@/lib/constants";
 
 const MAX_SECONDS = 30;
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 type Phase = "idle" | "recording" | "recorded" | "uploading" | "done";
 
@@ -154,7 +156,7 @@ export default function VoiceRecorder({ mode = "demo", token }: VoiceRecorderPro
         | { demoId?: string; ok?: boolean; error?: string }
         | null;
       if (!res.ok || (mode === "demo" ? !data?.demoId : !data?.ok)) {
-        setError(data?.error ?? "出了点小问题，请稍后再试。");
+        setError(data?.error ?? MSG_GENERIC);
         setPhase("recorded");
         return;
       }
@@ -167,13 +169,13 @@ export default function VoiceRecorder({ mode = "demo", token }: VoiceRecorderPro
       setDemoId(data!.demoId!);
       router.push(`/custom/demo/${data!.demoId}`);
     } catch {
-      setError("网络不太稳定，请重试一次。");
+      setError(MSG_NETWORK);
       setPhase("recorded");
     }
   }, [sample, consent, router, mode, token]);
 
   return (
-    <div className="rounded-2xl bg-night starfield text-paper px-6 py-8 sm:px-8">
+    <NightCard className="px-6 py-8 sm:px-8">
       {phase === "idle" && (
         <div className="text-center">
           <button
@@ -228,10 +230,10 @@ export default function VoiceRecorder({ mode = "demo", token }: VoiceRecorderPro
       {phase === "recorded" && sample && (
         <div className="text-center">
           <p className="text-sm text-moon mb-3">先听听这段样本，满意就继续：</p>
-          { }
-          <audio src={sample.url} controls preload="metadata" className="w-full" />
-          <label className="mt-5 flex items-start gap-2 text-left text-sm text-moon">
+          <AudioPlayer src={sample.url} title="录音样本" label="先听听这段录音样本" />
+          <label htmlFor="voice-consent" className="mt-5 flex items-start gap-2 text-left text-sm text-moon">
             <input
+              id="voice-consent"
               type="checkbox"
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
@@ -301,6 +303,6 @@ export default function VoiceRecorder({ mode = "demo", token }: VoiceRecorderPro
       <p className="mt-6 text-center text-xs text-moon/80">
         录音样本仅用于生成这段试听与后续内测服务，不会公开展示；如需删除可随时邮件联系我们。
       </p>
-    </div>
+    </NightCard>
   );
 }

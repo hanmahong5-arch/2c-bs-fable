@@ -9,6 +9,8 @@ import {
   type Subscriber,
 } from "@/lib/store";
 import { bjDaysSince, bjHour, bjToday, parseSerialState } from "@/lib/beijing";
+import { AUDIO_KEEP_DAYS, UNLOCK_HOUR } from "@/lib/constants";
+import NightCard from "@/components/ui/NightCard";
 import {
   AddToHomeGuide,
   InstantFirstStarter,
@@ -27,8 +29,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const UNLOCK_HOUR = 19; // 北京时间 19:00 解锁今晚故事
-const AUDIO_KEEP_DAYS = 14;
 const FOUNDING_CAP = Number(process.env.FOUNDING_CAP ?? "100");
 
 function NotFound() {
@@ -54,7 +54,7 @@ function Paywall({ sub, upcoming, seatsLeft, pendingNote }: { sub: Subscriber; u
   // 家庭码 = sub.id: webhook 用它自动匹配订单, 比贴整条链接靠谱
   const remark = `家庭码 ${sub.id} 孩子昵称 ${sub.childName}`;
   return (
-    <div className="rounded-2xl bg-night starfield p-6 text-paper">
+    <NightCard className="p-6">
       <p className="text-sm text-moon">3 晚免费连载已讲完</p>
       <h2 className="mt-2 font-display text-2xl leading-snug text-star-soft">
         {sub.childName}的故事，才刚刚开始
@@ -105,7 +105,7 @@ function Paywall({ sub, upcoming, seatsLeft, pendingNote }: { sub: Subscriber; u
         <code className="mx-1 rounded bg-night-deep px-1.5 py-0.5">{remark}</code>
         我们据此自动开通，无需注册。
       </p>
-    </div>
+    </NightCard>
   );
 }
 
@@ -146,6 +146,9 @@ export default async function RadioPage({
   // 解锁绕过 (七期 D1): 第一晚即时生成完就立即可见; 第 2 晚起回到 19:00 仪式感
   const instantUnlock = sub.status === "trial" && all.length === 1;
   const tonight = unlocked || instantUnlock ? views.find((v) => v.date === today) : undefined;
+  // 即时首晚: 文本已落、音频后台合成中 → 故事卡限时轮询自动刷出音频 (不用手动刷新)
+  const tonightAudioPending =
+    sub.status === "trial" && all.length === 1 && Boolean(tonight) && !tonight?.audioUrl;
   const history = views.filter((v) => v !== tonight);
   const starCount = views.filter((v) => v.starred).length;
   const serial = parseSerialState(sub.serialState);
@@ -167,10 +170,10 @@ export default async function RadioPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-5 py-10">
+    <div className="mx-auto max-w-2xl px-5 pt-10 pb-[calc(2.5rem_+_env(safe-area-inset-bottom))]">
       <RememberRadio token={token} />
       {/* 孩子的星空: 视觉锚 + 已点亮星星 */}
-      <div className="rounded-2xl bg-night starfield px-6 py-8 text-center text-paper">
+      <NightCard className="px-6 py-8 text-center">
         <p className="text-sm tracking-widest text-moon">亲 声 电 台</p>
         <h1 className="mt-2 font-display text-3xl text-star-soft">{sub.childName}的星空</h1>
         <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-moon">
@@ -180,7 +183,7 @@ export default async function RadioPage({
         {nights > 0 && (
           <p className="mt-1.5 text-xs text-moon/80">工坊已陪{sub.childName}走过第 {nights} 晚</p>
         )}
-      </div>
+      </NightCard>
 
       {/* 状态条 */}
       {sub.status === "trial" && !trialDone && (
@@ -198,7 +201,7 @@ export default async function RadioPage({
       {/* 今晚 */}
       <section className="mt-8">
         {tonight ? (
-          <StoryCard token={token} story={tonight} tonight />
+          <StoryCard token={token} story={tonight} tonight pendingAudio={tonightAudioPending} />
         ) : instantPending ? (
           <InstantFirstStarter token={token} childName={sub.childName} />
         ) : (

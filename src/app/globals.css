@@ -25,6 +25,17 @@ body {
   color: var(--color-ink);
 }
 
+/*
+ * 统一键盘焦点环 (此前 nav/链接/按钮只有 hover:, 键盘 / 微信 webview 看不见焦点)。
+ * 站点双底色: 纸面用深墨 outline 可见, 夜空用暖星光 box-shadow 可见 —— 两者都给, 任一底色至少一种生效。
+ * :focus-visible 只在键盘 / AT 聚焦时触发, 鼠标点击不显示, 不打扰常规交互。
+ */
+:focus-visible {
+  outline: 2px solid var(--color-night);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-night), 0 0 0 4px var(--color-star);
+}
+
 .font-display {
   font-family: var(--font-display);
 }

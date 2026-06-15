@@ -4,11 +4,13 @@
  * R5 每晚管线与 Vercel 即时生成 (api/radio/instant-first) 共用同一套
  * prompt / 重试 / 安全自检逻辑, 保证「第一晚即时生成」与「次晚管线续写」是同一个世界观。
  */
+import { TRIAL_NIGHTS } from "./constants";
 import type { Subscriber } from "./store";
 import { parseSerialState, type SerialState } from "./beijing";
 import { checkSafety, llmJson } from "./story-gen";
 
-export const TRIAL_NIGHTS = 3;
+// 连载晚数单一真源在 constants; 此处 re-export 供 scripts/radio-pipeline.ts 沿用旧 import 路径。
+export { TRIAL_NIGHTS };
 
 export interface RadioStoryOut {
   title: string;

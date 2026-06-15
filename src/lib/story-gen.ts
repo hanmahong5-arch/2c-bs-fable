@@ -2,15 +2,16 @@
  * story-gen.ts — 故事生成公共函数 (公共日更 gen-story.ts / 电台管线 radio-pipeline.ts /
  * Vercel 即时生成 api/radio/instant-first 共用; 零 node-only 依赖, 两侧均可跑)。
  *
- * env: NEWAPI_TRIAL_TOKEN 必须; NEWAPI_URL / STORY_MODEL / COSY_URL / COSY_API_KEY 可覆盖。
- * COSY 地址: R5 管线设 COSY_URL (localhost 直连), Vercel 只有 COSY_PUBLIC_URL → 依次回退。
+ * env: NEWAPI_TRIAL_TOKEN + STORY_MODEL 必须 (缺失即 fast-fail); NEWAPI_URL / COSY_URL / COSY_API_KEY 可覆盖。
+ * COSY 地址: R5 管线设 COSY_URL (内网直连), Vercel 只有 COSY_PUBLIC_URL → 依次回退到 COSY_FALLBACK_URL。
  */
+import { COSY_FALLBACK_URL } from "./constants";
+import { requireEnv } from "./env";
 
 export const NEWAPI_URL = process.env.NEWAPI_URL ?? "https://newapi.lurus.cn/v1/chat/completions";
 export const TOKEN = process.env.NEWAPI_TRIAL_TOKEN ?? "";
-export const STORY_MODEL = process.env.STORY_MODEL ?? "deepseek-chat";
 export const COSY_URL =
-  process.env.COSY_URL ?? process.env.COSY_PUBLIC_URL ?? "http://100.120.110.73:8123";
+  process.env.COSY_URL ?? process.env.COSY_PUBLIC_URL ?? COSY_FALLBACK_URL;
 export const COSY_API_KEY = process.env.COSY_API_KEY ?? "";
 
 // 哄睡场景: 轻缓、安抚 (与新闻播报的明快语气相反)
@@ -39,7 +40,7 @@ export async function llmJson<T>(
       Authorization: `Bearer ${TOKEN}`,
     },
     body: JSON.stringify({
-      model: STORY_MODEL,
+      model: requireEnv("STORY_MODEL"),
       temperature: opts.temperature ?? 1.0,
       max_tokens: opts.maxTokens ?? 2000,
       response_format: { type: "json_object" },

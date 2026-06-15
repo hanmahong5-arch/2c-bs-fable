@@ -3,14 +3,13 @@
  *
  * voice_id 红线: 只在服务端流转, 永不返回给浏览器。
  */
+import { requireEnv } from "./env";
 
 const VOICE_ID_RE = /^[a-f0-9]{12}$/;
 
 function cosyEnv(): { url: string; key: string } {
-  const url = process.env.COSY_PUBLIC_URL;
-  const key = process.env.COSY_API_KEY;
-  if (!url || !key) throw new Error("COSY_PUBLIC_URL / COSY_API_KEY missing");
-  return { url, key };
+  // 懒求值 fast-fail (见 env.ts): 缺 COSY 配置时清晰报错三要素, 不中途用 undefined 拼 URL。
+  return { url: requireEnv("COSY_PUBLIC_URL"), key: requireEnv("COSY_API_KEY") };
 }
 
 export interface RegisteredVoice {

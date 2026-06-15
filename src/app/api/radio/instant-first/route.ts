@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import {
   bumpFunnel,
   claimInstantSlot,
@@ -16,6 +15,7 @@ import { bjToday, parseSerialState, type SerialState } from "@/lib/beijing";
 import { notify } from "@/lib/ntfy";
 import { generateFor } from "@/lib/radio-story";
 import { TOKEN, synthStory } from "@/lib/story-gen";
+import { fail, ok, readJson } from "@/lib/api";
 
 /**
  * 即时首晚生成: trial 开通后不等次日管线, 当场写第一晚故事 (≈1-2 分钟)。
@@ -27,10 +27,6 @@ import { TOKEN, synthStory } from "@/lib/story-gen";
  * 超时从故障降级为延迟。
  */
 export const maxDuration = 300;
-
-function ok(body: Record<string, unknown>) {
-  return NextResponse.json(body);
-}
 
 /**
  * 空夜 (第一晚连文本都没写成): 计数 + 高优先级响铃。
@@ -66,15 +62,11 @@ async function synthWithRetry(
 }
 
 export async function POST(req: Request) {
-  let body: { token?: string };
-  try {
-    body = (await req.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ error: "invalid json" }, { status: 400 });
-  }
+  const body = await readJson<{ token?: string }>(req);
+  if (!body) return fail(400, "invalid json");
   const sub = await getSubscriberByToken(body.token ?? "");
-  if (!sub) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!TOKEN) return NextResponse.json({ error: "service not configured" }, { status: 503 });
+  if (!sub) return fail(401, "unauthorized");
+  if (!TOKEN) return fail(503, "service not configured");
 
   const date = bjToday();
   const serial = parseSerialState(sub.serialState);
@@ -92,6 +84,9 @@ export async function POST(req: Request) {
   if (!(await claimInstantSlot(sub.id))) {
     return ok({ skipped: true, busy: true }); // 已有一个在跑, 轮询页面等结果即可
   }
+  // 盲区探针 (item 19): 已领锁、即将走「生成+合成」风险路径 → 先记 started。
+  // started − ok − text − fail = 被 300s maxDuration 硬截杀、连下面 catch 都没跑到的次数。
+  await bumpFunnel(date, "instant_started").catch(() => {});
 
   let textWritten = false;
   try {
