@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ChevronDown, Download, Mic, Send, Share, Star, Trash2 } from "lucide-react";
 import VoiceRecorder from "@/components/voice-recorder";
 import AudioPlayer from "@/components/AudioPlayer";
 import { setRadioToken } from "@/lib/local-identity";
-import { MAX_NOTE, MSG_NETWORK } from "@/lib/constants";
+import { MAX_NOTE, MSG_NETWORK, MSG_TONIGHT_RESTING, msgTonightLibrary, msgTonightReplay } from "@/lib/constants";
+import type { TonightChoice } from "@/lib/tonight";
 
 export interface StoryView {
   date: string;
@@ -25,15 +27,18 @@ export function StoryCard({
   story,
   tonight,
   pendingAudio,
+  defaultOpen,
 }: {
   token: string;
   story: StoryView;
   tonight?: boolean;
   pendingAudio?: boolean;
+  /** 首屏即展开正文+播放器 (兜底·重听往期最爱场景: 哄睡时零点击直达播放)。 */
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
   const [starred, setStarred] = useState(story.starred);
-  const [open, setOpen] = useState(tonight ?? false);
+  const [open, setOpen] = useState(defaultOpen ?? tonight ?? false);
   const [busy, setBusy] = useState(false);
   const reported = useRef(false);
 
@@ -158,6 +163,75 @@ export function StoryCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** 今晚兜底分类信标 (九期): 挂载即 fire-and-forget 上报「孩子今晚拿到了什么」一次 (失败静默 — 不打扰睡前)。 */
+export function NightlyBeacon({
+  token,
+  kind,
+}: {
+  token: string;
+  kind: "fresh" | "replay" | "library" | "none";
+}) {
+  const sent = useRef(false);
+  useEffect(() => {
+    if (sent.current) return; // strict-mode 双挂载只上报一次
+    sent.current = true;
+    void fetch("/api/radio/fallback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, kind }),
+    }).catch(() => {});
+  }, [token, kind]);
+  return null;
+}
+
+/**
+ * 今晚兜底卡 (九期): 今晚新故事缺位 (R5/生成失败) 时给孩子一个真实可播的睡前故事 —— 永不留死胡同。
+ * replay=往期最爱 (家长本人声音, 首屏展开即可播) / library=精选库 (专业音频, 抗 R5 全挂) / none=温柔退路。
+ * 挂载即按 kind 打点 (保证率可测)。语气温柔不报警 (孩子可能在旁)。
+ */
+export function TonightFallback({
+  fb,
+  childName,
+  token,
+}: {
+  fb: TonightChoice<StoryView>;
+  childName: string;
+  token: string;
+}) {
+  if (fb.kind === "replay") {
+    return (
+      <div className="space-y-3">
+        <NightlyBeacon token={token} kind="replay" />
+        <p className="px-1 text-sm leading-relaxed text-ink-soft">{msgTonightReplay(childName)}</p>
+        <StoryCard token={token} story={fb.story} defaultOpen />
+      </div>
+    );
+  }
+  if (fb.kind === "library") {
+    return (
+      <div className="rounded-2xl border border-star bg-night starfield p-6 text-paper">
+        <NightlyBeacon token={token} kind="library" />
+        <p className="font-display text-lg leading-snug text-star-soft">{msgTonightLibrary(fb.title)}</p>
+        <div className="mt-4">
+          <AudioPlayer src={fb.audioSrc} title={fb.title} />
+        </div>
+        <Link
+          href={`/stories/${fb.slug}`}
+          className="mt-4 inline-block text-sm text-moon underline transition-colors hover:text-star"
+        >
+          看故事全文
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-2xl border border-star bg-night starfield p-6 text-center text-paper">
+      <NightlyBeacon token={token} kind="none" />
+      <p className="text-sm leading-relaxed text-moon">{MSG_TONIGHT_RESTING}</p>
     </div>
   );
 }

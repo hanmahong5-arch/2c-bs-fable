@@ -9,14 +9,18 @@ import {
   type Subscriber,
 } from "@/lib/store";
 import { bjDaysSince, bjHour, bjToday, parseSerialState } from "@/lib/beijing";
-import { AUDIO_KEEP_DAYS, UNLOCK_HOUR } from "@/lib/constants";
+import { AUDIO_KEEP_DAYS, MSG_TONIGHT_RESTING, UNLOCK_HOUR } from "@/lib/constants";
+import { getStories } from "@/lib/stories";
+import { pickFallback, type TonightChoice } from "@/lib/tonight";
 import NightCard from "@/components/ui/NightCard";
 import {
   AddToHomeGuide,
   InstantFirstStarter,
+  NightlyBeacon,
   NoteBox,
   RememberRadio,
   StoryCard,
+  TonightFallback,
   VoiceManager,
   WeeklyPack,
   type StoryView,
@@ -169,6 +173,18 @@ export default async function RadioPage({
     seatsLeft = Math.max(0, FOUNDING_CAP - paid);
   }
 
+  // 今晚兜底 (九期): 已解锁却没有今晚新故事、也不是即时首晚生成中 → 仅凭页面已取数据
+  // (往期音频 + 精选库) 选一个真实可播的睡前故事, 抗 R5 全挂, 永不留死胡同。
+  // 仅此分支才取精选库 (18 篇小文件, cheap; 随包发布的静态资源)。
+  let fallback: TonightChoice<StoryView> | null = null;
+  if (unlocked && !tonight && !instantPending) {
+    const library = await getStories();
+    const libraryWithAudio = library
+      .filter((s) => s.hasAudio)
+      .map((s) => ({ slug: s.slug, title: s.title }));
+    fallback = pickFallback(views, libraryWithAudio, `${token}:${today}`);
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-5 pt-10 pb-[calc(2.5rem_+_env(safe-area-inset-bottom))]">
       <RememberRadio token={token} />
@@ -201,22 +217,24 @@ export default async function RadioPage({
       {/* 今晚 */}
       <section className="mt-8">
         {tonight ? (
-          <StoryCard token={token} story={tonight} tonight pendingAudio={tonightAudioPending} />
+          <>
+            <StoryCard token={token} story={tonight} tonight pendingAudio={tonightAudioPending} />
+            <NightlyBeacon token={token} kind="fresh" />
+          </>
         ) : instantPending ? (
           <InstantFirstStarter token={token} childName={sub.childName} />
-        ) : (
+        ) : !unlocked ? (
           <div className="rounded-2xl border border-star bg-night starfield p-6 text-center text-paper">
-            {!unlocked ? (
-              <>
-                <Moon size={20} className="mx-auto text-moon" aria-hidden />
-                <p className="mt-3 font-display text-lg text-star-soft">今晚的故事 19:00 解锁</p>
-                <p className="mt-2 text-sm text-moon">工坊正在为{sub.childName}赶写今晚的新故事。</p>
-              </>
-            ) : (
-              <p className="text-sm leading-relaxed text-moon">
-                今晚工坊休息了一晚，明天的故事会准时来；下面的往期故事随时可以重听。
-              </p>
-            )}
+            <Moon size={20} className="mx-auto text-moon" aria-hidden />
+            <p className="mt-3 font-display text-lg text-star-soft">今晚的故事 19:00 解锁</p>
+            <p className="mt-2 text-sm text-moon">工坊正在为{sub.childName}赶写今晚的新故事。</p>
+          </div>
+        ) : fallback ? (
+          <TonightFallback fb={fallback} childName={sub.childName} token={token} />
+        ) : (
+          // 不可达 (unlocked && !tonight && !instantPending 必已算出 fallback, 至少 none); 防御性退路
+          <div className="rounded-2xl border border-star bg-night starfield p-6 text-center text-paper">
+            <p className="text-sm leading-relaxed text-moon">{MSG_TONIGHT_RESTING}</p>
           </div>
         )}
       </section>

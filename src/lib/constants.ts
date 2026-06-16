@@ -2,7 +2,7 @@
  * constants.ts — 跨文件复用的业务常量收口。
  *
  * 这些魔法值原先散落在多个路由/组件里 (审计实证重复), 易漂移; 收一处单一真源。
- * 只放纯字面量, 零运行时依赖 → client 组件与 server 路由都能 import。
+ * 只放纯字面量 (+ childName/title 内插的纯格式化函数), 零运行时依赖 → client 组件与 server 路由都能 import。
  * 运行期可覆盖的配置 (env) 不放这里, 见 env.ts。
  */
 
@@ -41,6 +41,17 @@ export const MSG_NETWORK = "网络好像打了个盹，请再试一次。";
 export const MSG_BUSY = "工坊正忙着，过一小会儿再试一次。";
 /** 兜底未知错误。 */
 export const MSG_GENERIC = "出了点小状况，请稍后再试。";
+
+// ── 今晚兜底文案 (九期: R5/生成缺位时电台页「总有一个可播故事」; 哄睡语气, 温柔不报警, 孩子可能在旁) ──
+/** 兜底·重听往期最爱抬头 (家长本人声音)。 */
+export const msgTonightReplay = (childName: string) =>
+  `今晚的新故事还在路上，先为${childName}挑了 TA 喜欢的——`;
+/** 兜底·精选库抬头 (专业音频)。 */
+export const msgTonightLibrary = (title: string) =>
+  `今晚先听一个工坊精选的睡前故事《${title}》`;
+/** 既无往期音频也无任何精选库素材时的温柔退路 (理论不该发生; 往期文字仍在下方可重读)。 */
+export const MSG_TONIGHT_RESTING =
+  "今晚工坊休息了一晚，明天的故事会准时来；下面的往期故事随时可以重听。";
 
 /**
  * CosyVoice 本机回退地址 — env (COSY_URL / COSY_PUBLIC_URL) 都没给时的内网直连兜底。

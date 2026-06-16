@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
       "./content/articles-taxonomy.json",
     ],
     "/sitemap.xml": ["./content/articles-index.jsonl", "./content/articles-taxonomy.json"],
+    // 九期: /radio 兜底 (今晚总有可播故事) 在 force-dynamic 运行期读精选库 → 故事 md + 配套音频
+    // 不被静态 import, 必须显式打进该路由的 serverless bundle (同 articles 教训, 否则线上 fs 读不到)。
+    "/radio/[token]": ["./content/stories/**", "./public/audio/**"],
   },
   async headers() {
     return [

@@ -411,11 +411,17 @@ export type FunnelEvent =
   | "instant_fail" // 第一晚: 文本都没写成 (空夜) — 高优先级告警
   | "asynth_started" // 文章亲声: 已领锁、即将合成 (盲区分母)
   | "asynth_ok" // 文章亲声: 合成成功
-  | "asynth_fail"; // 文章亲声: 合成失败
+  | "asynth_fail" // 文章亲声: 合成失败
+  // 今晚保证率 (九期): 电台页展示「孩子今晚拿到了什么」, replay/library/none 占比 = 兜底率/保证率
+  | "nightly_fresh" // 今晚: 当晚新故事在位 (正常)
+  | "nightly_replay" // 今晚缺位 → 兜底往期最爱 (家长本人声音)
+  | "nightly_library" // 今晚缺位 → 兜底精选库 (专业音频, 抗 R5 全挂)
+  | "nightly_none"; // 今晚缺位且无任何兜底素材 (应 ≈ 0; 非零=保证率破口)
 
 const FUNNEL_EVENTS: FunnelEvent[] = [
   "instant_started", "instant_ok", "instant_text", "instant_fail",
   "asynth_started", "asynth_ok", "asynth_fail",
+  "nightly_fresh", "nightly_replay", "nightly_library", "nightly_none",
 ];
 
 export async function bumpFunnel(date: string, event: FunnelEvent): Promise<void> {
