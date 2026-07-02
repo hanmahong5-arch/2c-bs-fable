@@ -129,6 +129,23 @@ export async function getSubscriber(id: string): Promise<Subscriber | null> {
   return asSub(id, await redis().hgetall(`sub:${id}`));
 }
 
+/**
+ * DSAR 自助注销: 抹除该订户的全部 Redis 态 (幂等)。
+ * 外部资源 (R5 音色 / Blob 音频) 由调用方先清 — 本函数只负责 store 层, 守「唯一数据层」约束。
+ * 删除顺序无关: token 映射 → 各晚故事 hash → 历史 ZSET → 档案 hash → active set。
+ */
+export async function deleteSubscriber(id: string): Promise<void> {
+  const r = redis();
+  const sub = await getSubscriber(id);
+  if (sub?.token) await r.del(`token:${sub.token}`);
+  // 历史索引里的每个日期都对应一个 story hash, 逐个删避免孤儿键。
+  const dates = await r.zrange(`stories:${id}`, 0, -1);
+  for (const d of dates) await r.del(`story:${id}:${String(d)}`);
+  await r.del(`stories:${id}`);
+  await r.del(`sub:${id}`);
+  await r.srem("subs:active", id);
+}
+
 export async function getSubscriberByToken(token: string): Promise<Subscriber | null> {
   if (!token || token.length > 64 || !/^[A-Za-z0-9_-]+$/.test(token)) return null;
   const id = await redis().get<string>(`token:${token}`);

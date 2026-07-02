@@ -18,6 +18,8 @@ export const MAX_NOTE = 50;
 export const MAX_CHILD_NAME = 12;
 /** 「孩子最近的一件事 / 喜好」字数上限。 */
 export const MAX_PREFS = 50;
+/** 「本周连载主题」字数上限 (家长自助设定, 进故事 prompt)。 */
+export const MAX_WEEKLY_THEME = 30;
 /** 联系方式 (微信号 / 手机) 字数上限。 */
 export const MAX_CONTACT = 40;
 

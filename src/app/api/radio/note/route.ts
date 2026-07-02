@@ -14,7 +14,8 @@ export async function POST(req: Request) {
   const sub = await getSubscriberByToken(body.token ?? "");
   if (!sub) return fail(401, "unauthorized");
   if (sub.status === "expired" || sub.status === "refunded") {
-    return fail(403, "连载已暂停，续订后就能继续捎话啦。");
+    // reason 机读标记: App 据此区分「连载暂停需续订」与 401 token 失效, 文案不变
+    return fail(403, "连载已暂停，续订后就能继续捎话啦。", { reason: "suspended" });
   }
 
   const note = clean(body.note);

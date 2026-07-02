@@ -8,9 +8,17 @@ import { NextResponse } from "next/server";
 /** prompt 注入标记 (控制字符另由 codePoint 过滤, 避免源码里出现裸控制字符 / no-control-regex)。 */
 const INJECTION_MARKERS = new Set(["<", ">", "{", "}", "`"]);
 
-/** 统一失败响应: {error} + status。 */
-export function fail(status: number, message: string): NextResponse {
-  return NextResponse.json({ error: message }, { status });
+/**
+ * 统一失败响应: {error} + status。
+ * extra 可选合入响应体, 供 App 机读区分同 status 的不同原因 (如 403 连载暂停 vs token 失效);
+ * 不传时行为与旧双参调用完全一致 (仅 {error})。
+ */
+export function fail(
+  status: number,
+  message: string,
+  extra?: Record<string, unknown>,
+): NextResponse {
+  return NextResponse.json({ error: message, ...extra }, { status });
 }
 
 /** 统一成功响应: 任意 body 形状 ({ok:true} / {url} / {skipped} …)。 */
