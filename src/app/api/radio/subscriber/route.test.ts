@@ -35,6 +35,30 @@ mock.module("@/lib/store", () => ({
   updateSubscriber: async (_id: string, patch: Partial<Subscriber>) => {
     lastPatch = patch;
   },
+  // mock.module 全局生效, 补齐 store 完整面避免跨文件测试载序导致缺 export
+  getStory: async () => null,
+  starStory: async () => {},
+  markStoryListened: async () => {},
+  bumpFunnel: async () => {},
+  claimInstantSlot: async () => true,
+  releaseInstantSlot: async () => {},
+  clearPendingNote: async () => {},
+  putStory: async () => {},
+  setStoryAudio: async () => {},
+  deleteSubscriber: async () => {},
+  setPendingNote: async () => {},
+  getArticleAudio: async () => null,
+  hasArticleSynthedToday: async () => false,
+  claimArticleSynthLock: async () => true,
+  releaseArticleSynthLock: async () => {},
+  markArticleSynthedToday: async () => {},
+  setArticleAudio: async () => {},
+  claimOrder: async () => true,
+  countSubscribers: async () => 0,
+  createSubscriber: async () => ({}),
+  getDemoVoice: async () => null,
+  getSubscriber: async () => null,
+  pushPendingOrder: async () => {},
 }));
 
 const { GET, POST } = await import("./route");
