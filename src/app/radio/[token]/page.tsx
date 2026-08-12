@@ -9,9 +9,11 @@ import {
   type Subscriber,
 } from "@/lib/store";
 import { bjDaysSince, bjHour, bjToday, parseSerialState } from "@/lib/beijing";
-import { AUDIO_KEEP_DAYS, MSG_TONIGHT_RESTING, UNLOCK_HOUR } from "@/lib/constants";
+import { MSG_TONIGHT_RESTING, UNLOCK_HOUR } from "@/lib/constants";
 import { getStories } from "@/lib/stories";
 import { pickFallback, type TonightChoice } from "@/lib/tonight";
+import { computeRadioState, computeSeatsLeft } from "@/lib/radio-state";
+import { toStoryView } from "./story-view";
 import NightCard from "@/components/ui/NightCard";
 import {
   AddToHomeGuide,
@@ -127,57 +129,39 @@ export default async function RadioPage({
   const all = await listStories(sub.id, 60);
   const articleAudios = (await listArticleAudios(sub.id)).slice(0, 5);
 
-  const views: StoryView[] = all.map((s) => {
-    const archived = bjDaysSince(s.date) >= AUDIO_KEEP_DAYS;
-    let paragraphs: string[] = [];
-    try {
-      paragraphs = JSON.parse(s.paragraphs) as string[];
-    } catch {
-      paragraphs = [s.paragraphs];
-    }
-    return {
-      date: s.date,
-      title: s.title,
-      paragraphs,
-      moral: s.moral,
-      audioUrl: archived ? "" : s.audioUrl,
-      starred: s.starred === "1",
-      archived,
-      note: s.note,
-    };
-  });
+  const views: StoryView[] = all.map((s) => toStoryView(s, bjDaysSince(s.date)));
 
   // 解锁绕过 (七期 D1): 第一晚即时生成完就立即可见; 第 2 晚起回到 19:00 仪式感
   const instantUnlock = sub.status === "trial" && all.length === 1;
   const tonight = unlocked || instantUnlock ? views.find((v) => v.date === today) : undefined;
-  // 即时首晚: 文本已落、音频后台合成中 → 故事卡限时轮询自动刷出音频 (不用手动刷新)
-  const tonightAudioPending =
-    sub.status === "trial" && all.length === 1 && Boolean(tonight) && !tonight?.audioUrl;
   const history = views.filter((v) => v !== tonight);
   const starCount = views.filter((v) => v.starred).length;
   const serial = parseSerialState(sub.serialState);
-  const nights = views.length;
-
-  // 即时首晚 (七期 D1): 刚开通、一晚都没有 → 渲染生成等待动画 (挂载即触发 instant-first)
-  const instantPending = sub.status === "trial" && all.length === 0 && Boolean(sub.voiceId);
-
-  const trialDone = sub.status === "trial" && nights >= 3;
-  const expired = sub.status === "expired" || sub.status === "refunded";
-  const showPaywall = trialDone || expired;
   const weeklyAvailable = views.some((v) => v.audioUrl && bjDaysSince(v.date) < 7);
+
+  // 状态机纯核 (radio-state.ts): 解锁绕过后, 该渲染什么全由此判定 (trialDone/expired/兜底/即时首晚)。
+  const state = computeRadioState({
+    status: sub.status,
+    storyCount: all.length,
+    unlocked,
+    hasTonight: Boolean(tonight),
+    tonightAudioUrl: tonight?.audioUrl ?? "",
+    hasVoiceId: Boolean(sub.voiceId),
+  });
+  const { tonightAudioPending, instantPending, trialDone, expired, showPaywall, nights, banner, needFallback } = state;
 
   // 真实余量: 创始家庭名额 = 容量帽 − 现役付费户 (不做假稀缺)
   let seatsLeft = 0;
   if (showPaywall) {
     const paid = (await listAllSubscribers()).filter((s) => s.status === "active").length;
-    seatsLeft = Math.max(0, FOUNDING_CAP - paid);
+    seatsLeft = computeSeatsLeft(FOUNDING_CAP, paid);
   }
 
   // 今晚兜底 (九期): 已解锁却没有今晚新故事、也不是即时首晚生成中 → 仅凭页面已取数据
   // (往期音频 + 精选库) 选一个真实可播的睡前故事, 抗 R5 全挂, 永不留死胡同。
   // 仅此分支才取精选库 (18 篇小文件, cheap; 随包发布的静态资源)。
   let fallback: TonightChoice<StoryView> | null = null;
-  if (unlocked && !tonight && !instantPending) {
+  if (needFallback) {
     const library = await getStories();
     const libraryWithAudio = library
       .filter((s) => s.hasAudio)
@@ -189,9 +173,9 @@ export default async function RadioPage({
     <div className="mx-auto max-w-2xl px-5 pt-10 pb-[calc(2.5rem_+_env(safe-area-inset-bottom))]">
       <RememberRadio token={token} />
       {/* 孩子的星空: 视觉锚 + 已点亮星星 */}
-      <NightCard className="px-6 py-8 text-center">
+      <NightCard className="rise-soft sky-live moonglow px-6 py-8 text-center">
         <p className="text-sm tracking-widest text-moon">亲 声 电 台</p>
-        <h1 className="mt-2 font-display text-3xl text-star-soft">{sub.childName}的星空</h1>
+        <h1 className="mt-2 font-display text-3xl leading-[1.3] text-star-soft">{sub.childName}的星空</h1>
         <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-moon">
           <Star size={14} className="fill-amber-400 text-amber-400" aria-hidden />
           已点亮 {starCount} 颗星 · 每晚听完一个故事，就多一颗
@@ -201,13 +185,13 @@ export default async function RadioPage({
         )}
       </NightCard>
 
-      {/* 状态条 */}
-      {sub.status === "trial" && !trialDone && (
+      {/* 状态条 (banner 由 radio-state 状态机判定) */}
+      {banner === "trialProgress" && (
         <p className="mt-4 rounded-xl bg-star-soft/40 px-4 py-3 text-sm text-ink">
           免费连载第 {Math.min(nights, 3)} / 3 晚——每晚 19:00 解锁新故事。
         </p>
       )}
-      {expired && (
+      {banner === "suspended" && (
         <p className="mt-4 rounded-xl bg-star-soft/40 px-4 py-3 text-sm leading-relaxed text-ink">
           连载暂停了：{sub.childName}的故事档案和你的声音设置我们会保存 90 天，
           随时续订就从这里继续讲。已生成的故事文字一直可以看。
@@ -224,7 +208,7 @@ export default async function RadioPage({
         ) : instantPending ? (
           <InstantFirstStarter token={token} childName={sub.childName} />
         ) : !unlocked ? (
-          <div className="rounded-2xl border border-star bg-night starfield p-6 text-center text-paper">
+          <div className="rise-soft rounded-2xl border border-star bg-night starfield sky-live moonglow p-6 text-center text-paper">
             <Moon size={20} className="mx-auto text-moon" aria-hidden />
             <p className="mt-3 font-display text-lg text-star-soft">今晚的故事 19:00 解锁</p>
             <p className="mt-2 text-sm text-moon">工坊正在为{sub.childName}赶写今晚的新故事。</p>

@@ -32,24 +32,24 @@ export default async function Home() {
   return (
     <>
       {/* Hero: 夜空 */}
-      <section className="bg-night starfield text-paper">
+      <section className="bg-night starfield sky-live moonglow text-paper">
         <div className="mx-auto max-w-5xl px-5 py-20 md:py-28 text-center">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-moon/30 px-4 py-1 text-sm text-moon">
+          <p className="rise-soft mb-4 inline-flex items-center gap-2 rounded-full border border-moon/30 px-4 py-1 text-sm text-moon">
             <Moon size={14} /> 每天一个新故事 · 全部免费收听
           </p>
-          <h1 className="font-display text-4xl md:text-5xl leading-tight text-star-soft">
+          <h1 className="rise-soft rise-d1 font-display text-4xl md:text-5xl leading-[1.28] tracking-[0.01em] text-star-soft">
             每晚一个原创寓言
             <br />
             温柔讲给孩子听
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-moon leading-relaxed">
+          <p className="rise-soft rise-d2 mx-auto mt-6 max-w-xl text-moon leading-loose">
             寓言星球每天创作一篇全新的中文睡前故事，并配上轻柔的情感朗读。
             关掉大灯，点开播放，让故事陪孩子入睡。
           </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+          <div className="rise-soft rise-d3 mt-10 flex flex-wrap justify-center gap-4">
             <Link
               href="/custom"
-              className="rounded-full bg-star px-8 py-3 font-medium text-night hover:bg-star-soft transition-colors"
+              className="cta-glow rounded-full bg-star px-8 py-3 font-medium text-night hover:bg-star-soft transition-colors"
             >
               用我的声音讲故事
             </Link>
@@ -80,8 +80,11 @@ export default async function Home() {
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {SERIAL_STEPS.map((s) => (
-              <div key={s.n} className="rounded-2xl border border-star bg-star-soft/30 px-4 py-5">
+            {SERIAL_STEPS.map((s, i) => (
+              <div
+                key={s.n}
+                className={`rise-soft rise-d${i + 1} rounded-2xl border border-star bg-star-soft/30 px-4 py-5 transition-shadow hover:shadow-star`}
+              >
                 <p className="font-display text-2xl text-night">{s.n}</p>
                 <p className="mt-1 font-medium text-ink">{s.title}</p>
                 <p className="mt-1 text-sm leading-relaxed text-ink-soft">{s.desc}</p>

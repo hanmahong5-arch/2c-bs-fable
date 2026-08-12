@@ -28,7 +28,7 @@ function SuccessScreen({ radioUrl, contact }: { radioUrl: string; contact: strin
   };
 
   return (
-    <NightCard className="p-6">
+    <NightCard className="rise-soft sky-live moonglow p-6">
       <p className="inline-flex items-center gap-2 text-sm text-moon">
         <KeyRound size={15} aria-hidden />
         开通成功 — 先把钥匙收好
@@ -53,7 +53,7 @@ function SuccessScreen({ radioUrl, contact }: { radioUrl: string; contact: strin
       </p>
       <button
         onClick={() => router.push(radioUrl)}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-star px-8 py-3.5 font-medium text-night hover:bg-star-soft transition-colors"
+        className="cta-glow mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-star px-8 py-3.5 font-medium text-night hover:bg-star-soft transition-colors"
       >
         <Sparkles size={18} aria-hidden />
         进入我的电台
@@ -176,7 +176,7 @@ export default function TrialForm() {
           placeholder="比如：朵朵、小石头"
           className="mt-1.5 w-full rounded-xl border border-ink/20 bg-white px-4 py-2.5 focus:border-night focus:outline-none"
         />
-        <span className="mt-1 block text-right text-xs text-ink-soft/80">
+        <span className="mt-1 block text-right text-xs text-ink-soft/90">
           {childName.length}/{MAX_CHILD_NAME} 字
         </span>
       </label>
@@ -207,7 +207,7 @@ export default function TrialForm() {
           placeholder="比如：刚开始学分床睡 / 怕黑 / 迷上了恐龙"
           className="mt-1.5 w-full rounded-xl border border-ink/20 bg-white px-4 py-2.5 focus:border-night focus:outline-none"
         />
-        <span className="mt-1 block text-right text-xs text-ink-soft/80">
+        <span className="mt-1 block text-right text-xs text-ink-soft/90">
           {prefs.length}/{MAX_PREFS} 字
         </span>
       </label>
@@ -228,11 +228,12 @@ export default function TrialForm() {
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-night px-8 py-3.5 font-medium text-star hover:bg-night-deep transition-colors disabled:opacity-50"
+        className="cta-glow inline-flex w-full items-center justify-center gap-2 rounded-full bg-night px-8 py-3.5 font-medium text-star hover:bg-night-deep transition-colors disabled:animate-none disabled:opacity-50"
       >
         <Sparkles size={18} aria-hidden />
         {busy ? "正在开通…" : "免费开通 3 晚专属连载"}
       </button>
+      <p className="text-center text-xs text-ink-soft">今晚 19:00，第一个故事就到 · 随时可一键删除声音</p>
 
       {error && (
         <p className="text-sm text-red-700" role="alert">

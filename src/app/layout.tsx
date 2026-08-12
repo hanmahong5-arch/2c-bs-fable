@@ -55,7 +55,7 @@ export default function RootLayout({
             <Link href="/" className="inline-flex min-h-11 items-center font-display text-xl text-star">
               寓言星球
             </Link>
-            <div className="flex items-center gap-4 text-sm text-moon sm:gap-6">
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 text-sm text-moon sm:gap-x-6">
               <Link href="/stories" className="inline-flex min-h-11 items-center py-2 hover:text-star transition-colors">
                 故事库
               </Link>
