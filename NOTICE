@@ -1,0 +1,40 @@
+fable.xin (寓言星球)
+Copyright (c) 2026 fable.xin. All rights reserved.
+
+本产品的许可条款见同目录 LICENSE 文件。
+本 NOTICE 声明本产品所依赖的第三方开源组件及其许可。各组件的
+版权归其各自作者所有，按其原始许可条款分发；完整许可文本随
+各自的 npm 包分发（见 node_modules/<package>/LICENSE）。
+
+────────────────────────────────────────────────────────
+运行时依赖 / Runtime dependencies
+────────────────────────────────────────────────────────
+- next (MIT) — Vercel, Inc.
+- react, react-dom (MIT) — Meta Platforms, Inc. and affiliates
+- @upstash/redis (MIT) — Upstash, Inc.
+- @vercel/analytics (MPL-2.0) — Vercel, Inc.
+- @vercel/blob (Apache-2.0) — Vercel, Inc.
+- lucide-react (ISC) — Lucide Contributors
+- fflate (MIT) — Arjun Barrett
+
+────────────────────────────────────────────────────────
+构建与开发依赖 / Build & development dependencies
+────────────────────────────────────────────────────────
+- typescript (Apache-2.0) — Microsoft Corporation
+- tailwindcss, @tailwindcss/postcss (MIT) — Tailwind Labs, Inc.
+- eslint (MIT) — OpenJS Foundation and contributors
+- eslint-config-next (MIT) — Vercel, Inc.
+- @resvg/resvg-js (MPL-2.0) — yisibl
+- @types/node, @types/react, @types/react-dom (MIT) — DefinitelyTyped contributors
+
+────────────────────────────────────────────────────────
+字体 / Fonts
+────────────────────────────────────────────────────────
+界面正文与标题优先调用用户系统已安装的字体（PingFang SC、
+Microsoft YaHei、思源宋体 / Noto Serif SC 等），本产品不随包
+分发这些字体文件。Noto 字体系列由 Google 以 SIL Open Font
+License 1.1 发布。
+
+────────────────────────────────────────────────────────
+本清单依据 package.json 声明整理。第三方组件的许可以其随包
+分发的原始许可文本为准；如有出入，以原始许可为准。

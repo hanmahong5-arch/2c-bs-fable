@@ -40,6 +40,7 @@ export function StoryCard({
   const [starred, setStarred] = useState(story.starred);
   const [open, setOpen] = useState(defaultOpen ?? tonight ?? false);
   const [busy, setBusy] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
   const reported = useRef(false);
 
   // 即时首晚: 文本已落库、音频后台合成中 → 限时轮询自动刷出音频 (≤~96s, 防永久轮询)
@@ -48,6 +49,7 @@ export function StoryCard({
     let n = 0;
     const t = setInterval(() => {
       n += 1;
+      setPollCount(n);
       if (n > 12) {
         clearInterval(t);
         return;
@@ -129,6 +131,9 @@ export function StoryCard({
               <p className="mt-2 text-sm text-moon" aria-live="polite">
                 文字已写好啦，正在用你的声音念，音频稍后自动出现在这里（不用刷新）。
               </p>
+              {pollCount > 0 && (
+                <p className="mt-1 text-xs text-moon">已经等了 {pollCount * 8} 秒…</p>
+              )}
             </div>
           ) : (
             <p className={`text-sm ${tonight ? "text-moon" : "text-ink-soft"}`}>
@@ -323,7 +328,7 @@ export function NoteBox({
               {busy ? "捎出中…" : "捎过去"}
             </button>
           </div>
-          <p className="mt-1.5 text-xs text-ink-soft/80">
+          <p className="mt-1.5 text-xs text-ink-soft/90">
             {note.length}/{MAX_NOTE} 字 · 当天可以改，工坊每天早上来取一次
           </p>
           {defaultNote && (
@@ -430,6 +435,7 @@ export function InstantFirstStarter({ token, childName }: { token: string; child
   const router = useRouter();
   const [stage, setStage] = useState<0 | 1>(0);
   const [gaveUp, setGaveUp] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
 
   useEffect(() => {
     void fetch("/api/radio/instant-first", {
@@ -437,7 +443,10 @@ export function InstantFirstStarter({ token, childName }: { token: string; child
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token }),
     }).catch(() => {});
-    const poll = setInterval(() => router.refresh(), INSTANT_POLL_MS);
+    const poll = setInterval(() => {
+      setPollCount((c) => c + 1);
+      router.refresh();
+    }, INSTANT_POLL_MS);
     const toStage2 = setTimeout(() => setStage(1), INSTANT_STAGE2_MS);
     const giveUp = setTimeout(() => setGaveUp(true), INSTANT_GIVEUP_MS);
     return () => {
@@ -472,6 +481,9 @@ export function InstantFirstStarter({ token, childName }: { token: string; child
               ? "大约 1-2 分钟，写好这页会自己亮起来，不用刷新。"
               : "故事已经写好，正在合成你声音的音频，马上就来。"}
           </p>
+          {pollCount > 0 && (
+            <p className="mt-1.5 text-xs text-moon">已经等了 {pollCount * 8} 秒…</p>
+          )}
         </>
       ) : (
         <p className="text-sm leading-relaxed text-moon">

@@ -42,6 +42,26 @@ mock.module("@/lib/store", () => ({
   setPendingNote: async () => {},
   markStoryListened: async () => {},
   updateSubscriber: async () => {},
+  getStory: async () => null,
+  starStory: async () => {},
+  bumpFunnel: async () => {},
+  claimInstantSlot: async () => true,
+  releaseInstantSlot: async () => {},
+  clearPendingNote: async () => {},
+  putStory: async () => {},
+  setStoryAudio: async () => {},
+  getArticleAudio: async () => null,
+  hasArticleSynthedToday: async () => false,
+  claimArticleSynthLock: async () => true,
+  releaseArticleSynthLock: async () => {},
+  markArticleSynthedToday: async () => {},
+  setArticleAudio: async () => {},
+  claimOrder: async () => true,
+  countSubscribers: async () => 0,
+  createSubscriber: async () => ({}),
+  getDemoVoice: async () => null,
+  getSubscriber: async () => null,
+  pushPendingOrder: async () => {},
 }));
 
 mock.module("@/lib/cosy", () => ({
@@ -57,6 +77,8 @@ mock.module("@/lib/audio-storage", () => ({
     deletedAudioKey = audioKey;
     return 0;
   },
+  putRadioAudio: async () => "https://blob/x.mp3",
+  putArticleAudio: async () => "https://blob/article.mp3",
 }));
 
 const { POST } = await import("./route");
