@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { put } from "@vercel/blob";
 import { rememberDemoVoice } from "@/lib/store";
 import { fail, ok } from "@/lib/api";
-import { MAX_UPLOAD_BYTES } from "@/lib/constants";
+import { MAX_UPLOAD_BYTES, MSG_ENGINE_OFFLINE } from "@/lib/constants";
 
 // 同步流全程 (上传→克隆登记→合成→存 Blob) 需要的窗口; Fluid compute 下 hobby 可到 90s
 export const maxDuration = 90;
@@ -79,6 +79,8 @@ export async function POST(req: Request) {
     }
     if (!res.ok) {
       console.error("voice register failed", res.status, await res.text());
+      // 502/504 = relay 够不着 R5 上游 (引擎不在线), 与「忙」区分: 这种情况重试无用
+      if (res.status === 502 || res.status === 504) return fail(503, MSG_ENGINE_OFFLINE);
       return fail(502, "声音学习失败，请稍后再试。");
     }
     const data = (await res.json()) as { voice_id?: string; prompt_text?: string };
@@ -89,8 +91,9 @@ export async function POST(req: Request) {
     }
     voiceId = data.voice_id; // 只留在服务端, 永不返回给客户端
   } catch (e) {
+    // fetch 抛异常 = 连接超时/不可达 (拿不到任何 HTTP 状态), 是引擎不在线而不是忙
     console.error("voice register error", e);
-    return fail(504, BUSY_MESSAGE);
+    return fail(504, MSG_ENGINE_OFFLINE);
   }
 
   // demoId→voiceId 留底 30 天: 试听转订阅时复用音色, 失败不阻塞 demo 主流程
@@ -120,6 +123,8 @@ export async function POST(req: Request) {
     if (res.status === 429 || res.status === 503) return fail(429, BUSY_MESSAGE);
     if (!res.ok) {
       console.error("synth failed", res.status, await res.text());
+      // newapi 网关够不着后端 → 同样是引擎不在线, 不是忙
+      if (res.status === 502 || res.status === 504) return fail(503, MSG_ENGINE_OFFLINE);
       return fail(502, "合成失败，请稍后再试。");
     }
     mp3 = await res.arrayBuffer();

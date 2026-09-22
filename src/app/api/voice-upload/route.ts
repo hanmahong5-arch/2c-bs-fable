@@ -1,7 +1,7 @@
 import { getSubscriberByToken, updateSubscriber } from "@/lib/store";
 import { deleteVoice, registerVoice } from "@/lib/cosy";
 import { fail, ok } from "@/lib/api";
-import { MAX_UPLOAD_BYTES } from "@/lib/constants";
+import { MAX_UPLOAD_BYTES, MSG_ENGINE_OFFLINE } from "@/lib/constants";
 
 // 注册含 whisper 转写 (与合成共用 GPU 串行锁), 窗口同 voice-demo
 export const maxDuration = 90;
@@ -47,7 +47,9 @@ export async function POST(req: Request) {
       return fail(400, "这段录音无法识别，请换安静环境录 15–30 秒清晰的说话声。");
     }
     console.error("voice upload register error", e);
-    return fail(503, "声音工坊这会儿正忙，请过两分钟再试。");
+    // 503 = 引擎在但忙 (模型加载中 / GPU 串行锁); 502/504 与「无 status」(超时、连不上) = 引擎不在线
+    if (status === 503) return fail(503, "声音工坊这会儿正忙，请过两分钟再试。");
+    return fail(503, MSG_ENGINE_OFFLINE);
   }
 
   const oldVoiceId = sub.voiceId;
