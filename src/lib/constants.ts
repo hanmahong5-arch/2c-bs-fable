@@ -41,6 +41,13 @@ export const ARTICLE_SYNTH_MAX_CHARS = 500;
 export const MSG_NETWORK = "网络好像打了个盹，请再试一次。";
 /** 引擎 / 工坊繁忙, 稍后可重试 (GPU 争用、503 等)。 */
 export const MSG_BUSY = "工坊正忙着，过一小会儿再试一次。";
+/**
+ * 朗读引擎完全联系不上 (连接超时 / 502 / 504) —— 与 MSG_BUSY 的关键区别: 这不是「忙」, 重试无用。
+ * 2026-09-15 R5 掉线 4 天期间两者混用, 家长看到的是「正忙, 请过两分钟再试」, 于是反复白试;
+ * 故此处不给重试时限, 只给替代动作。判据见 voice-demo/voice-upload 路由的上游状态码分支。
+ */
+export const MSG_ENGINE_OFFLINE =
+  "声音工坊正在休整，暂时学不了新的声音。我们已经收到提醒在修，明天再来试试吧。";
 /** 兜底未知错误。 */
 export const MSG_GENERIC = "出了点小状况，请稍后再试。";
 
